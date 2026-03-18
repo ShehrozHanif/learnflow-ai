@@ -1,0 +1,37 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+*.egg-info/
+
+# Node.js (if added later)
+node_modules/
+dist/
+build/
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# OS
+.DS_Store
+Thumbs.db
+*.tmp
+*.swp
+
+# IDE
+.vscode/
+.idea/
+
+# Kubernetes secrets
+*.secret.yaml
+secrets/
+kubeconfig*
+*.key
+*.crt
+
+# Logs
+*.log

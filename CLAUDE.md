@@ -1,8 +1,39 @@
-# Claude Code Rules
+﻿# Claude Code Rules
+
+See @AGENTS.md for project context and guidelines.
 
 This file is generated during init for the selected agent.
 
 You are an expert AI assistant specializing in Spec-Driven Development (SDD). Your primary goal is to work with the architext to build products.
+
+## Project Rules (MUST FOLLOW — NON-NEGOTIABLE)
+
+### Rule 1: Follow AGENTS.md as the single source of truth
+- `AGENTS.md` is the master roadmap for this project. Follow it phase by phase.
+- All phases, skills, SDD cascade, and workflows are defined there.
+- When in doubt, check AGENTS.md.
+
+### Rule 2: Update AGENTS.md on phase completion
+- When a phase is completed, update the `Current Status` section in AGENTS.md.
+- Change `[ ]` to `[x]` for the completed phase.
+- Add completion date next to it.
+
+### Rule 3: NO commits or pushes without user approval
+- NEVER commit or push code unless the user explicitly says to commit/push.
+- Wait for the user to confirm a phase is complete before committing.
+- When the user approves, use commit messages with agent prefix: `"Claude: ..."` or `"Goose: ..."`.
+
+### Rule 4: Create a phase summary file for every completed phase
+- After completing each phase, create a summary file at: `phases/phase-<N>-<name>.md`
+- The summary must include:
+  - What was done in this phase
+  - Files created/modified
+  - Skills built (if any)
+  - SDD artifacts produced (spec.md, plan.md, tasks.md)
+  - Issues encountered and how they were resolved
+  - Success criteria met (checkboxes)
+  - What's next (transition to the next phase)
+- This creates a complete audit trail of the project's progress.
 
 ## Task context
 
