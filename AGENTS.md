@@ -14,7 +14,7 @@ LearnFlow is an AI-powered Python tutoring platform built entirely using AI Skil
 |-------|------|--------|------|
 | 1 | Environment Setup + Constitution | [x] COMPLETE | 2026-03-19 |
 | 2 | Foundation Skills | [x] COMPLETE | 2026-03-19 |
-| 3 | Infrastructure Skills | [ ] NOT STARTED | — |
+| 3 | Infrastructure Skills | [x] COMPLETE | 2026-03-19 |
 | 4 | Backend Services | [ ] NOT STARTED | — |
 | 5 | Frontend | [ ] NOT STARTED | — |
 | 6 | MCP Integration + Documentation | [ ] NOT STARTED | — |
@@ -43,10 +43,36 @@ hack3/
 │   │   │   └── helm_install.sh
 │   │   └── references/
 │   │       └── kubectl-commands.md
+│   ├── kafka-k8s-setup/              # [DONE] Deploy Kafka on K8s + topic mgmt
+│   │   ├── SKILL.md
+│   │   ├── scripts/
+│   │   │   ├── deploy_kafka.sh
+│   │   │   ├── verify_kafka.py
+│   │   │   ├── create_topics.sh
+│   │   │   └── verify_topics.py
+│   │   └── references/
+│   │       └── kafka-k8s-guide.md
+│   ├── postgres-k8s-setup/           # [DONE] Deploy PostgreSQL on K8s + migrations
+│   │   ├── SKILL.md
+│   │   ├── scripts/
+│   │   │   ├── deploy_postgres.sh
+│   │   │   ├── verify_postgres.py
+│   │   │   ├── run_migrations.sh
+│   │   │   ├── verify_schema.py
+│   │   │   └── migrations/
+│   │   │       └── 001_initial_schema.sql
+│   │   └── references/
+│   │       └── postgres-k8s-guide.md
 │   ├── context7-efficient/            # [PRE-BUILT] Real-time library docs (77% token savings)
 │   └── skill-creator-pro/             # [PRE-BUILT] Skill factory for generating new skills
 ├── specs/                             # SDD artifacts per feature
-│   └── 001-foundation-skills/         # Phase 2 specs (complete)
+│   ├── 001-foundation-skills/         # Phase 2 specs (complete)
+│   │   ├── spec.md
+│   │   ├── plan.md
+│   │   ├── research.md
+│   │   ├── tasks.md
+│   │   └── checklists/
+│   └── 002-infrastructure-skills/     # Phase 3 specs (complete)
 │       ├── spec.md
 │       ├── plan.md
 │       ├── research.md
@@ -54,9 +80,13 @@ hack3/
 │       └── checklists/
 ├── history/
 │   ├── prompts/                       # Prompt History Records (auto-created)
+│   │   ├── foundation-skills/         # Phase 2 PHRs
+│   │   └── infrastructure-skills/     # Phase 3 PHRs (6 records)
 │   └── adr/                           # Architecture Decision Records
 ├── phases/                            # Phase summary files
-│   └── phase-1-setup.md
+│   ├── phase-1-setup.md
+│   ├── phase-2-foundation-skills.md
+│   └── phase-3-infrastructure-skills.md
 ├── .specify/                          # SpecifyPlus framework internals
 │   ├── memory/constitution.md         # Project constitution (6 principles)
 │   ├── templates/
@@ -107,10 +137,12 @@ Requirement → Spec → Plan → Task → Skill → AI Execution
 - Token budgets met: SKILL.md < 100 tokens, output < 5 lines
 - Full SDD cascade completed: specify → clarify → plan → tasks → analyze → implement
 
-### Phase 3: Infrastructure Skills (NEXT)
-- **kafka-k8s-setup**: Deploy Kafka, create topics, verify connectivity
-- **postgres-k8s-setup**: Deploy PostgreSQL, run migrations, verify schemas
-- Success: AI agents autonomously deploy and verify Kafka/PostgreSQL
+### Phase 3: Infrastructure Skills (COMPLETE)
+- **kafka-k8s-setup**: Deploy Kafka (apache/kafka:3.9.0 KRaft), create topics, verify connectivity. Pipeline: `bash deploy_kafka.sh | python verify_kafka.py`, `bash create_topics.sh <topics> | python verify_topics.py`
+- **postgres-k8s-setup**: Deploy PostgreSQL (Bitnami Helm), run migrations, verify schemas. Pipeline: `bash deploy_postgres.sh | python verify_postgres.py`, `bash run_migrations.sh | python verify_schema.py`
+- Token budgets met: kafka SKILL.md 76 tokens, postgres SKILL.md 65 tokens
+- Full SDD cascade completed: specify → clarify → plan → tasks → analyze → implement
+- Key adaptation: Bitnami Kafka images unavailable on Docker Hub; switched to raw K8s manifest with Apache official image
 
 ### Phase 4: Backend Services
 - **fastapi-dapr-agent**: FastAPI + Dapr microservices with AI agents
@@ -148,8 +180,8 @@ Requirement → Spec → Plan → Task → Skill → AI Execution
 | k8s-foundation | DONE | 2 | K8s health check + Helm install |
 | context7-efficient | PRE-BUILT | — | Real-time library docs (77% savings) |
 | skill-creator-pro | PRE-BUILT | — | Generate new production-grade skills |
-| kafka-k8s-setup | TODO | 3 | Deploy Kafka on K8s |
-| postgres-k8s-setup | TODO | 3 | Deploy PostgreSQL on K8s |
+| kafka-k8s-setup | DONE | 3 | Deploy Kafka on K8s (apache/kafka:3.9.0 KRaft) |
+| postgres-k8s-setup | DONE | 3 | Deploy PostgreSQL on K8s (Bitnami Helm) |
 | fastapi-dapr-agent | TODO | 4 | FastAPI + Dapr microservices |
 | mcp-code-execution | TODO | 6 | MCP with code execution pattern |
 | nextjs-k8s-deploy | TODO | 5 | Deploy Next.js apps |
