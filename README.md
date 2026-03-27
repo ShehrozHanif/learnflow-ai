@@ -189,6 +189,13 @@ Every phase has full SDD artifacts in `specs/`:
 | Spec-Kit Plus | 15% | Full SDD cascade for all 8 phases |
 | LearnFlow Completion | 15% | Full stack deployed via skills |
 
+## Repositories
+
+| Repository | Purpose |
+|-----------|---------|
+| [learnflow-ai](https://github.com/ShehrozHanif/learnflow-ai) | LearnFlow application — built entirely using AI Skills |
+| [skills-library](https://github.com/ShehrozHanif/skills-library) | Reusable Skills with MCP Code Execution (8 skills) |
+
 ## Project Structure
 
 See [AGENTS.md](AGENTS.md) for the complete project roadmap and directory structure.
