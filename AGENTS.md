@@ -29,7 +29,7 @@ LearnFlow is an AI-powered Python tutoring platform built entirely using AI Skil
 | G | Quizzes & Exercises | [x] COMPLETE | 2026-03-27 |
 | H | Polish & Edge Cases | [x] COMPLETE | 2026-03-27 |
 | 9 | Cloud Deployment (GKE) | [x] COMPLETE | 2026-03-27 |
-| 10 | Continuous Deployment (Argo CD) | [ ] NOT STARTED | — |
+| 10 | Continuous Deployment (Argo CD + GitHub Actions) | [x] COMPLETE | 2026-03-27 |
 
 ## Directory Structure
 
@@ -410,8 +410,21 @@ Requirement → Spec → Plan → Task → Skill → AI Execution
 - **GKE deployment YAML**: `templates/k8s/gke-deployment.yaml` (Artifact Registry image, `imagePullPolicy: Always`, LoadBalancer service)
 - **Public URL**: http://136.111.213.221
 
-### Phase 10: Continuous Deployment
-- Argo CD with GitHub Actions for GitOps
+### Phase 10: Continuous Deployment — Argo CD + GitHub Actions (COMPLETE)
+- **Argo CD** installed on GKE (`argocd` namespace, 7 pods)
+- **Argo CD Application** (`learnflow`): watches `main` branch, auto-syncs `gke-deployment.yaml`
+  - Automated sync with `selfHeal: true` and `prune: true`
+  - Status: Synced + Healthy
+- **Argo CD UI**: https://35.188.91.77 (admin / `rf82xT9CsNnw789g`)
+- **GitHub Actions workflow** (`.github/workflows/deploy.yaml`):
+  - Triggers on push to `main` when app source changes
+  - Builds Docker image, tags with commit SHA + `latest`
+  - Pushes to Artifact Registry
+  - Updates `gke-deployment.yaml` with new image tag
+  - Argo CD auto-detects manifest change → deploys to GKE
+- **GitOps flow**: `git push main` → GitHub Actions builds image → updates manifest → Argo CD syncs → GKE updated
+- **GitHub repo**: https://github.com/ShehrozHanif/learnflow-ai
+- **Required secret**: `GCP_SA_KEY` — GCP service account JSON key (must be added to GitHub repo secrets for CI/CD to work)
 
 ## Skills Inventory
 
