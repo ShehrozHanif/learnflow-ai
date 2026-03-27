@@ -1,0 +1,22 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: learnflow
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/ShehrozHanif/learnflow-ai.git
+    targetRevision: main
+    path: .claude/skills/nextjs-k8s-deploy/scripts/templates/k8s
+    directory:
+      include: 'gke-deployment.yaml'
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: learnflow
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
