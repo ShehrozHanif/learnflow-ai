@@ -18,7 +18,7 @@ spec:
     spec:
       containers:
         - name: frontend
-          image: us-central1-docker.pkg.dev/todo-platform-489221/learnflow-repo/learnflow-frontend:20bc229a6c9eecf2ed2cc6f07d95a2ff706937fa
+          image: us-central1-docker.pkg.dev/todo-platform-489221/learnflow-repo/learnflow-frontend:290f9836ffbef2dcf6d7e62710d0ea9737baa401
           imagePullPolicy: Always
           ports:
             - containerPort: 3000
