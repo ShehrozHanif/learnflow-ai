@@ -15,12 +15,20 @@ LearnFlow is an AI-powered Python tutoring platform built entirely using AI Skil
 | 1 | Environment Setup + Constitution | [x] COMPLETE | 2026-03-19 |
 | 2 | Foundation Skills | [x] COMPLETE | 2026-03-19 |
 | 3 | Infrastructure Skills | [x] COMPLETE | 2026-03-19 |
-| 4 | Backend Services | [ ] NOT STARTED | — |
-| 5 | Frontend | [ ] NOT STARTED | — |
-| 6 | MCP Integration + Documentation | [ ] NOT STARTED | — |
-| 7 | LearnFlow Build (Claude + Goose) | [ ] NOT STARTED | — |
-| 8 | Polish & Demo | [ ] NOT STARTED | — |
-| 9 | Cloud Deployment | [ ] NOT STARTED | — |
+| 4 | Backend Services | [x] COMPLETE | 2026-03-20 |
+| 5 | Frontend | [x] COMPLETE | 2026-03-20 |
+| 6 | MCP Integration + Documentation | [x] COMPLETE | 2026-03-20 |
+| 7 | LearnFlow Build (Claude + Goose) | [x] COMPLETE | 2026-03-20 |
+| 8 | Polish & Demo | [x] COMPLETE | 2026-03-20 |
+| A | Authentication (JWT + Role-Based) | [x] COMPLETE | 2026-03-27 |
+| B | Real Chat with OpenAI | [x] COMPLETE | 2026-03-27 |
+| C | Triage Agent + NLP Routing | [x] COMPLETE | 2026-03-27 |
+| D | Progress Tracking (Live) | [x] COMPLETE | 2026-03-27 |
+| E | Code Execution (Live Sandbox) | [x] COMPLETE | 2026-03-27 |
+| F | Struggle Detection (Live) | [x] COMPLETE | 2026-03-27 |
+| G | Quizzes & Exercises | [x] COMPLETE | 2026-03-27 |
+| H | Polish & Edge Cases | [x] COMPLETE | 2026-03-27 |
+| 9 | Cloud Deployment (GKE) | [x] COMPLETE | 2026-03-27 |
 | 10 | Continuous Deployment (Argo CD) | [ ] NOT STARTED | — |
 
 ## Directory Structure
@@ -63,6 +71,82 @@ hack3/
 │   │   │       └── 001_initial_schema.sql
 │   │   └── references/
 │   │       └── postgres-k8s-guide.md
+│   ├── fastapi-dapr-agent/            # [DONE] FastAPI + Dapr AI tutoring microservices
+│   │   ├── SKILL.md
+│   │   ├── scripts/
+│   │   │   ├── deploy_services.sh
+│   │   │   ├── verify_services.py
+│   │   │   ├── test_routing.sh
+│   │   │   ├── verify_routing.py
+│   │   │   └── templates/
+│   │   │       ├── app/
+│   │   │       │   ├── main.py
+│   │   │       │   ├── agents.py
+│   │   │       │   ├── requirements.txt
+│   │   │       │   └── Dockerfile
+│   │   │       ├── dapr/
+│   │   │       │   ├── kafka-pubsub.yaml
+│   │   │       │   └── statestore.yaml
+│   │   │       └── k8s/
+│   │   │           └── deployment.yaml.tmpl
+│   │   └── references/
+│   │       └── fastapi-dapr-guide.md
+│   ├── nextjs-k8s-deploy/             # [DONE] Deploy Next.js frontend + Monaco editor
+│   │   ├── SKILL.md
+│   │   ├── scripts/
+│   │   │   ├── deploy_frontend.sh
+│   │   │   ├── verify_frontend.py
+│   │   │   └── templates/
+│   │   │       ├── app/               # Next.js 14 source
+│   │   │       │   └── src/app/
+│   │   │       │       ├── page.jsx              # Main UI (~1300 lines, all components)
+│   │   │       │       ├── api/
+│   │   │       │       │   ├── auth/login/       # JWT login
+│   │   │       │       │   ├── auth/register/    # User registration
+│   │   │       │       │   ├── auth/me/          # Token verification
+│   │   │       │       │   ├── chat/             # AI chat with NLP routing
+│   │   │       │       │   ├── execute/          # Python code sandbox
+│   │   │       │       │   ├── progress/         # Mastery tracking
+│   │   │       │       │   ├── progress/check-struggle/  # Periodic struggle check
+│   │   │       │       │   ├── quizzes/          # List quizzes
+│   │   │       │       │   ├── quizzes/generate/ # AI quiz generation
+│   │   │       │       │   ├── quizzes/load/     # Load single quiz
+│   │   │       │       │   ├── quizzes/submit/   # Quiz auto-grading
+│   │   │       │       │   ├── exercises/submit/ # Exercise auto-grading + AI review
+│   │   │       │       │   ├── teacher/alerts/   # Struggle alerts list
+│   │   │       │       │   ├── teacher/alerts/resolve/   # Resolve alert
+│   │   │       │       │   ├── teacher/assign/   # Assign exercise to student
+│   │   │       │       │   ├── teacher/exercises/generate/ # AI exercise generation
+│   │   │       │       │   └── teacher/students/ # Student list
+│   │   │       │       └── lib/
+│   │   │       │           ├── db.ts             # Neon PostgreSQL pool
+│   │   │       │           ├── api-auth.ts       # JWT auth helper
+│   │   │       │           └── kafka.ts          # KafkaJS struggle events
+│   │   │       └── k8s/
+│   │   │           └── deployment.yaml
+│   │   └── references/
+│   │       └── nextjs-k8s-guide.md
+│   ├── mcp-code-execution/            # [DONE] MCP Code Execution (99.7% token savings)
+│   │   ├── SKILL.md
+│   │   ├── scripts/
+│   │   │   ├── query_k8s.py
+│   │   │   ├── query_db.py
+│   │   │   ├── query_kafka.py
+│   │   │   ├── system_status.py
+│   │   │   └── verify_mcp.py
+│   │   └── references/
+│   │       └── mcp-pattern-guide.md
+│   ├── docusaurus-deploy/             # [DONE] Deploy Docusaurus docs on K8s
+│   │   ├── SKILL.md
+│   │   ├── scripts/
+│   │   │   ├── deploy_docs.sh
+│   │   │   ├── verify_docs.py
+│   │   │   └── templates/
+│   │   │       ├── app/               # Docusaurus source (10 doc pages + config)
+│   │   │       └── k8s/
+│   │   │           └── deployment.yaml
+│   │   └── references/
+│   │       └── docusaurus-guide.md
 │   ├── context7-efficient/            # [PRE-BUILT] Real-time library docs (77% token savings)
 │   └── skill-creator-pro/             # [PRE-BUILT] Skill factory for generating new skills
 ├── specs/                             # SDD artifacts per feature
@@ -72,25 +156,76 @@ hack3/
 │   │   ├── research.md
 │   │   ├── tasks.md
 │   │   └── checklists/
-│   └── 002-infrastructure-skills/     # Phase 3 specs (complete)
-│       ├── spec.md
-│       ├── plan.md
-│       ├── research.md
-│       ├── tasks.md
-│       └── checklists/
+│   ├── 002-infrastructure-skills/     # Phase 3 specs (complete)
+│   │   ├── spec.md
+│   │   ├── plan.md
+│   │   ├── research.md
+│   │   ├── tasks.md
+│   │   └── checklists/
+│   ├── 003-backend-services/          # Phase 4 specs (complete)
+│   │   ├── spec.md
+│   │   ├── plan.md
+│   │   ├── tasks.md
+│   │   └── research.md
+│   ├── 004-frontend/                  # Phase 5 specs (complete)
+│   │   ├── spec.md
+│   │   ├── plan.md
+│   │   ├── tasks.md
+│   │   └── checklists/
+│   ├── 005-mcp-documentation/         # Phase 6 specs (complete)
+│   │   ├── spec.md
+│   │   ├── plan.md
+│   │   ├── tasks.md
+│   │   └── checklists/
+│   ├── 006-learnflow-build/           # Phase 7 specs (complete)
+│   │   ├── spec.md
+│   │   ├── plan.md
+│   │   ├── tasks.md
+│   │   └── checklists/
+│   ├── 007-polish-demo/               # Phase 8 specs (complete)
+│   │   ├── spec.md
+│   │   ├── plan.md
+│   │   ├── tasks.md
+│   │   └── checklists/
+│   └── 008-authentication/            # Phase A specs
 ├── history/
 │   ├── prompts/                       # Prompt History Records (auto-created)
 │   │   ├── foundation-skills/         # Phase 2 PHRs
-│   │   └── infrastructure-skills/     # Phase 3 PHRs (6 records)
+│   │   ├── infrastructure-skills/     # Phase 3 PHRs (6 records)
+│   │   ├── backend-services/          # Phase 4 PHRs
+│   │   ├── frontend/                  # Phase 5 PHRs
+│   │   ├── mcp-documentation/         # Phase 6 PHRs
+│   │   ├── learnflow-build/           # Phase 7 PHRs
+│   │   └── polish-demo/              # Phase 8 PHRs
 │   └── adr/                           # Architecture Decision Records
+├── scripts/                           # Database migration scripts
+│   ├── migrate-phase-f.mjs           # Creates assigned_exercises, extends struggle_alerts
+│   └── migrate-phase-g.mjs           # Creates quizzes, quiz_attempts, extends assigned_exercises
 ├── phases/                            # Phase summary files
 │   ├── phase-1-setup.md
 │   ├── phase-2-foundation-skills.md
-│   └── phase-3-infrastructure-skills.md
+│   ├── phase-3-infrastructure-skills.md
+│   ├── phase-4-backend-services.md
+│   ├── phase-5-frontend.md
+│   ├── phase-6-mcp-documentation.md
+│   ├── phase-7-learnflow-build.md
+│   ├── phase-8-polish-demo.md
+│   ├── phase-f-struggle-detection.md
+│   ├── phase-g-quizzes-exercises.md
+│   └── phase-h-polish-edge-cases.md
 ├── .specify/                          # SpecifyPlus framework internals
 │   ├── memory/constitution.md         # Project constitution (6 principles)
 │   ├── templates/
 │   └── scripts/
+├── deploy_all.sh                      # Master deploy — full stack in one command
+├── verify_all.py                      # System-wide health check
+├── port_forward.sh                    # Expose all services locally
+├── teardown.sh                        # Clean removal of all resources
+├── demo_scenario.sh                   # Demo: Student Maya + Teacher Rodriguez
+├── goose-instructions.md              # Cross-agent compatibility guide
+├── docs/
+│   └── skill-development-guide.md     # MCP Code Execution pattern tutorial
+├── README.md                          # Project documentation for submission
 ├── AGENTS.md                          # This file — project roadmap
 ├── CLAUDE.MD                          # AI agent behavior rules
 └── requirment.md                      # Hackathon 3 requirements document
@@ -144,30 +279,136 @@ Requirement → Spec → Plan → Task → Skill → AI Execution
 - Full SDD cascade completed: specify → clarify → plan → tasks → analyze → implement
 - Key adaptation: Bitnami Kafka images unavailable on Docker Hub; switched to raw K8s manifest with Apache official image
 
-### Phase 4: Backend Services
-- **fastapi-dapr-agent**: FastAPI + Dapr microservices with AI agents
+### Phase 4: Backend Services (COMPLETE)
+- **fastapi-dapr-agent**: Single Docker image, 6 K8s Deployments configured via env vars
 - 6 agents: Triage, Concepts, Code Review, Debug, Exercise, Progress
-- Kafka pub/sub for async communication between agents
+- Kafka pub/sub via Dapr sidecars (topics: learning, code, exercise, struggle, responses)
+- PostgreSQL state store via Dapr for progress tracking
+- Mock mode (`OPENAI_API_KEY=mock`) for demo without real API
+- Keyword-based triage routing with struggle detection priority
+- Pipeline: `bash deploy_services.sh | python verify_services.py`
+- Test: `bash test_routing.sh | python verify_routing.py`
+- Resource budget: ~832Mi requests, ~1.66GB limits (fits in 3GB Minikube with Phase 3)
 
-### Phase 5: Frontend
-- **nextjs-k8s-deploy**: Deploy Next.js app with Monaco editor
-- Student and Teacher dashboards
-- Code execution sandbox (5s timeout, 50MB memory)
+### Phase 5: Frontend (COMPLETE)
+- **nextjs-k8s-deploy**: Next.js 14 App Router + TypeScript + Tailwind CSS
+- Monaco editor via `@monaco-editor/react` (CDN-loaded, lazy import)
+- Student dashboard: Chat + Code Editor + Progress (3-column layout)
+- Teacher dashboard: Class overview + Struggle alerts + Exercise generator
+- Code execution sandbox: API route with `execFile`, 5s timeout, 50KB max
+- Chat proxy: `/api/chat` → `triage-agent.learnflow.svc` via K8s DNS
+- Standalone Docker output (~150MB image)
+- Pipeline: `bash deploy_frontend.sh | python verify_frontend.py`
+- Resource budget: 128Mi request, 256Mi limit
 
-### Phase 6: MCP Integration + Documentation
-- **mcp-code-execution**: MCP servers for real-time AI context
-- **docusaurus-deploy**: Auto-generated documentation site
+### Phase 6: MCP Integration + Documentation (COMPLETE)
+- **mcp-code-execution**: Python scripts replacing 3 MCP servers (99.7% token savings)
+  - `query_k8s.py` — K8s pods, services, logs (~50 tokens vs ~15,000)
+  - `query_db.py` — PostgreSQL tables, rows, schema (~30 tokens vs ~10,000)
+  - `query_kafka.py` — Kafka topics, consumer groups (~30 tokens vs ~10,000)
+  - `system_status.py` — Aggregated JSON + `verify_mcp.py` parser
+- **docusaurus-deploy**: Docusaurus 3.7 docs site on K8s (nginx, ~30MB image)
+  - 10 documentation pages: intro, getting-started, 6 skills, 2 architecture
+  - Pipeline: `bash deploy_docs.sh | python verify_docs.py`
+  - Resource budget: 64Mi request, 128Mi limit
 
-### Phase 7: LearnFlow Build
-- Build complete application using Skills with Claude Code AND Goose
-- Cross-agent testing: same skills work on both agents
+### Phase 7: LearnFlow Build (COMPLETE)
+- **Master orchestration**: `deploy_all.sh` deploys full stack (5 steps, dependency order, fail-fast)
+- **System verification**: `verify_all.py` checks all 5 components (Kafka, PostgreSQL, Backend, Frontend, Docs)
+- **Local access**: `port_forward.sh` exposes Frontend (3000), API (8000), Docs (8080)
+- **Clean teardown**: `teardown.sh` with confirmation prompt
+- **Cross-agent**: `goose-instructions.md` — same skills work on Claude Code AND Goose
+- **Demo scenario**: `demo_scenario.sh` — Student Maya + Teacher Rodriguez interaction via API
+- Single command deployment: `bash deploy_all.sh` → `python verify_all.py`
 
-### Phase 8: Polish & Demo
-- Documentation complete, demo ready, submitted
-- Demo scenario: Student Maya + Teacher Rodriguez interaction
+### Phase 8: Polish & Demo (COMPLETE)
+- **README.md**: Full project documentation with architecture, quick start, skills inventory, evaluation criteria mapping
+- **docs/skill-development-guide.md**: MCP Code Execution pattern tutorial with LearnFlow examples
+- All 8 evaluation criteria explicitly addressed in documentation
+- Demo scenario: Student Maya + Teacher Rodriguez interaction via `demo_scenario.sh`
 
-### Phase 9: Cloud Deployment
-- Deploy on Azure, Google, or Oracle Cloud
+### Phase A: Authentication — JWT + Role-Based (COMPLETE)
+- JWT authentication with `jsonwebtoken` — login, register, token verification
+- Role-based access control: `student` and `teacher` roles
+- `/api/auth/login`, `/api/auth/register`, `/api/auth/me` API routes
+- Auth state persisted in localStorage (`lf_token`) with auto-login on refresh
+- Landing page with role selection → Login/Register forms → Dashboard routing
+- `AUTH_SECRET` env var for JWT signing, passwords hashed with bcrypt
+
+### Phase B: Real Chat with OpenAI (COMPLETE)
+- Replaced mock chat with live OpenAI `gpt-4o-mini` integration
+- `/api/chat` route proxies messages to AI with Python tutoring system prompt
+- Chat history stored in `chat_messages` table (PostgreSQL) per user
+- Streaming-style response handling with conversation context
+- Graceful fallback when `OPENAI_API_KEY=mock`
+
+### Phase C: Triage Agent + NLP Routing (COMPLETE)
+- NLP-based message classification using OpenAI (`max_tokens: 10, temperature: 0`)
+- Routes to 6 specialized agents: `concepts`, `code`, `debug`, `exercise`, `struggle`, `triage`
+- Each agent has a unique system prompt tailored to its domain
+- Fallback to keyword-based routing when API key unavailable
+- Triage agent acts as default catch-all for unclassified messages
+
+### Phase D: Progress Tracking — Live (COMPLETE)
+- `/api/progress` — GET (fetch per-topic mastery) and POST (update scores)
+- Mastery calculated with weighted formula: exercises (40%) + quizzes (30%) + code quality (20%) + streak (10%)
+- 4 mastery levels: Beginner (0-40%), Learning (41-70%), Proficient (71-90%), Mastered (91-100%)
+- Color-coded progress bars in Student dashboard (red → yellow → green → blue)
+- Real-time `avgMastery` calculation across all topics
+
+### Phase E: Code Execution — Live Sandbox (COMPLETE)
+- `/api/execute` — runs Python code via `child_process.execFile` with `python3`
+- Security: 5-second timeout, 1MB output buffer, `PYTHONDONTWRITEBYTECODE=1`
+- Monaco code editor integration with syntax highlighting
+- Output display with error/success differentiation
+- Consecutive failure tracking (feeds into struggle detection)
+
+### Phase F: Struggle Detection — Live (COMPLETE)
+- **4 struggle triggers**: `repeated_error` (5+ consecutive failures), `frustrated_message` (NLP detection in chat), `low_quiz_score` (<50%), `stuck_time` (3+ errors in 10 min)
+- **Kafka integration**: `publishStruggleEvent()` sends events to `struggle` topic via KafkaJS
+- **Teacher alerts dashboard**: Auto-refresh every 10 seconds, alert type badges, resolve button
+- `/api/teacher/alerts` — list unresolved alerts with user info
+- `/api/teacher/alerts/resolve` — mark alert as resolved
+- `/api/teacher/assign` — assign exercise to specific student
+- `/api/teacher/exercises/generate` — AI generates exercise (title, description, starter code, expected output)
+- `/api/progress/check-struggle` — periodic check for stuck_time and low_quiz_score triggers (called every 60s)
+- Graceful Kafka fallback — publishes when available, silently skips when not
+
+### Phase G: Quizzes & Exercises (COMPLETE)
+- **AI quiz generation** (`/api/quizzes/generate`): Topic + difficulty → 5 MCQ questions via OpenAI
+- **Quiz auto-grading** (`/api/quizzes/submit`): Answer comparison, percentage scoring, best-of tracking
+- **Exercise auto-grading** (`/api/exercises/submit`): 3-tier grading — code execution → output comparison → AI code review
+- **Quiz load** (`/api/quizzes/load`): Strips correct answers for students, shows all for teachers
+- **Student Exercises tab**: Take a Quiz section, Previous Quizzes with retake, Assigned Exercises with status badges
+- **Active Quiz UI**: Question-by-question MCQ with highlighted selections, score results with per-question explanations
+- **Active Exercise UI**: Inline code editor with starter code, Submit & Grade button, grade + feedback display
+- **Teacher quiz generation**: Select topic + difficulty, quiz available to all students
+- Grade ≥ 70 = completed; mastery recalculated on every quiz/exercise submission
+- DB tables: `quizzes` (JSONB questions), `quiz_attempts`, `assigned_exercises` (extended with grading columns)
+
+### Phase H: Polish & Edge Cases (COMPLETE)
+- **Error handling**: All fetch calls wrapped in try/catch with descriptive error messages
+- **Toast notifications**: `Toast` component — errors (red), success (green), info (blue), 4s auto-dismiss
+- **Loading states**: `LoadingSpinner` component for StudentDashboard and TeacherDashboard data loading
+- **Empty states**: Descriptive messages for no alerts, no exercises, no quizzes
+- **Mobile responsiveness**: Horizontal-scrolling tab bar (`overflowX: auto`), iOS zoom prevention (`font-size: 16px !important` at 768px)
+- **Session persistence**: `useLocalStorage` hook syncs React state to localStorage
+  - Active tab persisted as `lf_student_tab` — survives page refresh
+  - Code editor content persisted as `lf_code` — code survives refresh
+  - Auth token already persisted via `lf_token` (Phase A)
+- **Frontend rebuilt and redeployed** to K8s with all Phase A-H changes
+
+### Phase 9: Cloud Deployment — GKE (COMPLETE)
+- **Cloud provider**: Google Cloud Platform (GKE)
+- **Cluster**: Reused existing `todo-cluster` (2x `e2-standard-2`, us-central1-a) — shared with todo app via namespace isolation
+- **Artifact Registry**: `learnflow-repo` in `us-central1` — stores Docker images
+- **Image**: `us-central1-docker.pkg.dev/todo-platform-489221/learnflow-repo/learnflow-frontend:latest`
+- **Namespace**: `learnflow` (isolated from `todo-platform`)
+- **Replicas**: 2 pods for high availability
+- **Service**: LoadBalancer with public IP `136.111.213.221`
+- **Secrets**: K8s secrets for DATABASE_URL, AUTH_SECRET, OPENAI_API_KEY
+- **GKE deployment YAML**: `templates/k8s/gke-deployment.yaml` (Artifact Registry image, `imagePullPolicy: Always`, LoadBalancer service)
+- **Public URL**: http://136.111.213.221
 
 ### Phase 10: Continuous Deployment
 - Argo CD with GitHub Actions for GitOps
@@ -182,10 +423,29 @@ Requirement → Spec → Plan → Task → Skill → AI Execution
 | skill-creator-pro | PRE-BUILT | — | Generate new production-grade skills |
 | kafka-k8s-setup | DONE | 3 | Deploy Kafka on K8s (apache/kafka:3.9.0 KRaft) |
 | postgres-k8s-setup | DONE | 3 | Deploy PostgreSQL on K8s (Bitnami Helm) |
-| fastapi-dapr-agent | TODO | 4 | FastAPI + Dapr microservices |
-| mcp-code-execution | TODO | 6 | MCP with code execution pattern |
-| nextjs-k8s-deploy | TODO | 5 | Deploy Next.js apps |
-| docusaurus-deploy | TODO | 6 | Deploy documentation site |
+| fastapi-dapr-agent | DONE | 4 | FastAPI + Dapr microservices (6 AI agents, Kafka pub/sub, mock mode) |
+| mcp-code-execution | DONE | 6 | MCP Code Execution (99.7% token savings, 5 scripts) |
+| nextjs-k8s-deploy | DONE | 5 | Deploy Next.js + Monaco frontend (Student/Teacher dashboards, code sandbox) |
+| docusaurus-deploy | DONE | 6 | Deploy Docusaurus docs on K8s (10 pages, nginx) |
+
+## Production Enhancement Phases (A-H)
+
+After the initial 8 infrastructure/build phases, 8 additional production-readiness phases were completed to transform LearnFlow from a demo into a fully functional AI tutoring platform:
+
+| Phase | Focus | Key Deliverables |
+|-------|-------|-----------------|
+| A | Authentication | JWT login/register, role-based routing (student/teacher), bcrypt passwords |
+| B | Real Chat | Live OpenAI gpt-4o-mini integration, chat history in PostgreSQL, conversation context |
+| C | NLP Routing | OpenAI-based message classifier, 6 specialized agent prompts, keyword fallback |
+| D | Progress Tracking | Weighted mastery formula, 4 levels, color-coded progress bars, per-topic tracking |
+| E | Code Execution | Python sandbox (execFile, 5s timeout), Monaco editor, consecutive failure tracking |
+| F | Struggle Detection | 4 trigger types, KafkaJS events, teacher alerts (10s polling), exercise assignment |
+| G | Quizzes & Exercises | AI quiz generation, 3-tier auto-grading, exercise assignment flow, mastery updates |
+| H | Polish | Toast notifications, loading spinners, empty states, mobile CSS, localStorage persistence |
+
+**API Routes Created (Phases A-H):** 17 routes total
+**Database Tables Added:** `quizzes`, `quiz_attempts`, `assigned_exercises` (extended), `struggle_alerts` (extended)
+**Libraries Added:** `kafkajs`, `jsonwebtoken`, `bcryptjs`, `openai`
 
 ## MCP Code Execution Pattern
 
@@ -203,8 +463,11 @@ Result: 77-98% token reduction vs direct MCP integration.
 Topic Mastery = Exercise completion (40%) + Quiz scores (30%) + Code quality (20%) + Streak (10%)
 - 0-40% → Beginner (Red) | 41-70% → Learning (Yellow) | 71-90% → Proficient (Green) | 91-100% → Mastered (Blue)
 
-### Struggle Detection Triggers
-- Same error 3+ times | Stuck > 10 min | Quiz < 50% | "I don't understand" | 5+ failed executions
+### Struggle Detection Triggers (Implemented in Phase F)
+- `repeated_error`: 5+ consecutive code execution failures → Kafka event + teacher alert
+- `frustrated_message`: NLP detection of frustration in chat messages → Kafka event + teacher alert
+- `low_quiz_score`: Quiz score < 50% → Kafka event + teacher alert
+- `stuck_time`: 3+ errors within 10 minutes → periodic check (every 60s) + teacher alert
 
 ### Code Sandbox
 - Timeout: 5s | Memory: 50MB | No network/filesystem | Standard library only (MVP)
