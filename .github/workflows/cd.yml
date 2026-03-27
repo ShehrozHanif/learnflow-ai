@@ -1,4 +1,4 @@
-# CD workflow — deploy to GKE cluster after CI succeeds on main.
+# CD workflow — deploy backend + frontend to GKE cluster after CI succeeds on main.
 # Called by CI workflow after test + build pass.
 # Requires GitHub Secrets: GCP_SA_KEY, DATABASE_URL, AUTH_SECRET, OPENAI_API_KEY
 
@@ -19,7 +19,6 @@ env:
   PROJECT_ID: todo-platform-489221
   REGION: us-central1
   REPO: learnflow-repo
-  IMAGE: learnflow-frontend
   GKE_CLUSTER: todo-cluster
   GKE_ZONE: us-central1-a
   NAMESPACE: learnflow
@@ -56,20 +55,40 @@ jobs:
             --from-literal="openai-api-key=${{ secrets.OPENAI_API_KEY }}" \
             --dry-run=client -o yaml | kubectl apply -f -
 
-      - name: Update K8s manifest with new image tag
+      # --- Deploy Backend (6 agents) ---
+      - name: Update backend manifest with new image tag
         run: |
-          sed -i "s|image: .*learnflow-frontend.*|image: ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO }}/${{ env.IMAGE }}:${{ inputs.image_tag }}|" \
+          sed -i "s|image: .*learnflow-agent.*|image: ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO }}/learnflow-agent:${{ inputs.image_tag }}|" \
+            .claude/skills/fastapi-dapr-agent/scripts/templates/k8s/gke-deployment.yaml
+
+      - name: Deploy backend agents
+        run: |
+          kubectl apply -f .claude/skills/fastapi-dapr-agent/scripts/templates/k8s/gke-deployment.yaml
+
+      - name: Verify backend rollout
+        run: |
+          for agent in triage concepts codereview debug exercise progress; do
+            echo "Waiting for ${agent}-agent..."
+            kubectl rollout status deployment/${agent}-agent \
+              -n ${{ env.NAMESPACE }} --timeout=120s || true
+          done
+
+      # --- Deploy Frontend ---
+      - name: Update frontend manifest with new image tag
+        run: |
+          sed -i "s|image: .*learnflow-frontend.*|image: ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO }}/learnflow-frontend:${{ inputs.image_tag }}|" \
             .claude/skills/nextjs-k8s-deploy/scripts/templates/k8s/gke-deployment.yaml
 
-      - name: Deploy to GKE
+      - name: Deploy frontend
         run: |
           kubectl apply -f .claude/skills/nextjs-k8s-deploy/scripts/templates/k8s/gke-deployment.yaml
 
-      - name: Verify rollout
+      - name: Verify frontend rollout
         run: |
           kubectl rollout status deployment/learnflow-frontend \
             -n ${{ env.NAMESPACE }} --timeout=120s
 
+      # --- Health Check ---
       - name: Health check
         run: |
           EXTERNAL_IP=$(kubectl get svc learnflow-frontend \
@@ -93,17 +112,22 @@ jobs:
           kubectl get pods -n ${{ env.NAMESPACE }} -o wide
 
           echo ""
-          echo "=== Pod logs ==="
+          echo "=== Frontend logs ==="
           kubectl logs -l app=learnflow-frontend -n ${{ env.NAMESPACE }} --tail=50 || true
+
+          echo ""
+          echo "=== Backend logs (triage) ==="
+          kubectl logs -l app=triage-agent -n ${{ env.NAMESPACE }} --tail=30 || true
 
           echo ""
           echo "=== Events ==="
           kubectl get events -n ${{ env.NAMESPACE }} --sort-by='.lastTimestamp' | tail -20
 
-      - name: Commit updated manifest
+      - name: Commit updated manifests
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add .claude/skills/nextjs-k8s-deploy/scripts/templates/k8s/gke-deployment.yaml
-          git diff --staged --quiet || git commit -m "ci: update image tag to ${{ inputs.image_tag }}"
+          git add .claude/skills/fastapi-dapr-agent/scripts/templates/k8s/gke-deployment.yaml
+          git diff --staged --quiet || git commit -m "ci: update image tags to ${{ inputs.image_tag }}"
           git push

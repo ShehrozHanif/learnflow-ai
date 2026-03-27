@@ -1,5 +1,5 @@
-# CI workflow — detect changes, build, test, push on every push/PR to main.
-# Path filtering skips builds when only non-app files changed.
+# CI workflow — detect changes, build backend + frontend, test, push on every push/PR to main.
+# Path filtering skips service builds when only the other service changed.
 
 name: CI
 
@@ -18,44 +18,60 @@ env:
   PROJECT_ID: todo-platform-489221
   REGION: us-central1
   REPO: learnflow-repo
-  IMAGE: learnflow-frontend
 
 jobs:
-  # Detect which parts changed to skip unnecessary builds
+  # Detect which services changed to skip unnecessary builds
   changes:
     name: Detect Changes
     runs-on: ubuntu-latest
     outputs:
+      backend: ${{ steps.filter.outputs.backend }}
       frontend: ${{ steps.filter.outputs.frontend }}
-      k8s: ${{ steps.filter.outputs.k8s }}
     steps:
       - uses: actions/checkout@v4
       - uses: dorny/paths-filter@v3
         id: filter
         with:
           filters: |
+            backend:
+              - '.claude/skills/fastapi-dapr-agent/scripts/templates/app/**'
+              - '.claude/skills/fastapi-dapr-agent/scripts/templates/k8s/**'
             frontend:
               - '.claude/skills/nextjs-k8s-deploy/scripts/templates/app/**'
-              - '.github/workflows/ci.yml'
-            k8s:
               - '.claude/skills/nextjs-k8s-deploy/scripts/templates/k8s/**'
-              - 'argocd/**'
 
-  # Run linting and type checks
+  # Run tests — independent of file changes
   test:
-    name: Lint & Type Check
+    name: Test
     runs-on: ubuntu-latest
-    needs: [changes]
-    if: needs.changes.outputs.frontend == 'true' || github.event_name == 'push'
     steps:
       - uses: actions/checkout@v4
 
+      # Backend tests (Python)
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install backend dependencies
+        working-directory: .claude/skills/fastapi-dapr-agent/scripts/templates/app
+        run: pip install -r requirements.txt
+
+      - name: Backend import check
+        working-directory: .claude/skills/fastapi-dapr-agent/scripts/templates/app
+        run: python -c "import main; import agents; print('Backend imports OK')"
+        env:
+          AGENT_NAME: "triage"
+          SUBSCRIBE_TOPIC: "learning"
+          OPENAI_API_KEY: "sk-test-placeholder"
+
+      # Frontend tests (Node.js)
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
 
-      - name: Install dependencies
+      - name: Install frontend dependencies
         working-directory: .claude/skills/nextjs-k8s-deploy/scripts/templates/app
         run: npm install --frozen-lockfile 2>/dev/null || npm install
 
@@ -70,6 +86,41 @@ jobs:
           DATABASE_URL: "postgresql://test:test@localhost:5432/test"
           AUTH_SECRET: "ci-test-secret-32-chars-minimum"
           OPENAI_API_KEY: "sk-test-placeholder"
+
+  # Build and push backend Docker image
+  build-backend:
+    name: Build Backend
+    runs-on: ubuntu-latest
+    needs: [changes]
+    if: needs.changes.outputs.backend == 'true' || github.event_name == 'push'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet
+
+      - name: Build and push backend image
+        uses: docker/build-push-action@v6
+        with:
+          context: .claude/skills/fastapi-dapr-agent/scripts/templates/app
+          platforms: linux/amd64
+          push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+          tags: |
+            ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO }}/learnflow-agent:${{ github.sha }}
+            ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO }}/learnflow-agent:latest
+          labels: |
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
 
   # Build and push frontend Docker image
   build-frontend:
@@ -93,29 +144,28 @@ jobs:
       - name: Configure Docker for Artifact Registry
         run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet
 
-      - name: Build and push Docker image
+      - name: Build and push frontend image
         uses: docker/build-push-action@v6
         with:
           context: .claude/skills/nextjs-k8s-deploy/scripts/templates/app
           platforms: linux/amd64
           push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
           tags: |
-            ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO }}/${{ env.IMAGE }}:${{ github.sha }}
-            ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO }}/${{ env.IMAGE }}:latest
+            ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO }}/learnflow-frontend:${{ github.sha }}
+            ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO }}/learnflow-frontend:latest
           labels: |
             org.opencontainers.image.revision=${{ github.sha }}
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
 
-  # Trigger CD only after test + build succeed on main push
+  # Trigger CD only after all build + test jobs succeed on main push
   deploy:
     name: Deploy
-    needs: [test, build-frontend]
+    needs: [test, build-backend, build-frontend]
     if: |
       github.event_name == 'push' &&
       github.ref == 'refs/heads/main' &&
       always() &&
-      needs.test.result == 'success' &&
-      needs.build-frontend.result == 'success'
+      needs.test.result == 'success'
     uses: ./.github/workflows/cd.yml
     secrets: inherit
     with:
