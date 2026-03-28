@@ -138,9 +138,98 @@ const MODULES = [
   { n:"08", label:"Libraries",       sub:"pip & APIs"              },
 ];
 
+function FeatureModal({ feature, onClose }) {
+  const modalContent = {
+    "AI Tutoring Agents": {
+      title: "6 Specialized AI Agents",
+      sections: [
+        { icon: "🎯", name: "Triage Agent", desc: "Analyzes your question and routes it to the best specialist. Uses NLP to understand intent — concepts, debugging, exercises, or code review." },
+        { icon: "📖", name: "Concepts Agent", desc: "Explains Python topics with clear examples and analogies. Adapts explanations to your current mastery level." },
+        { icon: "🔍", name: "Code Review Agent", desc: "Reviews your code for quality, best practices, and potential bugs. Provides actionable improvement suggestions." },
+        { icon: "🐛", name: "Debug Agent", desc: "Helps you understand and fix errors. Walks through your code step-by-step to find the root cause." },
+        { icon: "💪", name: "Exercise Agent", desc: "Creates practice challenges tailored to your level. Generates unique problems for topics you need to strengthen." },
+        { icon: "📈", name: "Progress Agent", desc: "Tracks your learning journey across all topics. Identifies strengths, weaknesses, and recommends what to study next." },
+      ]
+    },
+    "Live Code Editor": {
+      title: "Write & Run Python in Your Browser",
+      sections: [
+        { icon: "⚡", name: "Instant Execution", desc: "Run Python code directly in the browser with real-time output. No setup, no installation required." },
+        { icon: "🎨", name: "Syntax Highlighting", desc: "Monaco editor (same as VS Code) with full Python syntax highlighting and auto-completion." },
+        { icon: "🔒", name: "Secure Sandbox", desc: "Code runs in an isolated sandbox with 5-second timeout and memory limits. Safe for experimentation." },
+        { icon: "📊", name: "Execution Tracking", desc: "Every code run is tracked — success rate, streak, and consecutive failures feed into your progress score." },
+      ]
+    },
+    "Smart Progress Tracking": {
+      title: "Mastery-Based Learning System",
+      sections: [
+        { icon: "🔴", name: "Beginner (0-40%)", desc: "Just getting started. Focus on completing exercises and understanding core concepts." },
+        { icon: "🟡", name: "Learning (41-70%)", desc: "Building momentum. Keep practicing with quizzes and coding challenges to strengthen understanding." },
+        { icon: "🟢", name: "Proficient (71-90%)", desc: "Strong grasp of the topic. Polish your skills with advanced exercises and code quality improvements." },
+        { icon: "🔵", name: "Mastered (91-100%)", desc: "Expert level achieved! Maintain your streak and help others while exploring advanced patterns." },
+      ],
+      formula: true
+    },
+    "Struggle Detection": {
+      title: "Real-Time Student Support",
+      sections: [
+        { icon: "🔁", name: "Repeated Errors", desc: "5+ consecutive code failures trigger an alert. The system detects when a student is stuck in a loop." },
+        { icon: "😤", name: "Frustration Detection", desc: "NLP analyzes chat messages for signs of frustration. Proactive support before the student gives up." },
+        { icon: "📉", name: "Low Quiz Scores", desc: "Quiz scores below 50% generate an alert. Teachers can assign targeted exercises to address gaps." },
+        { icon: "⏰", name: "Time-Based Detection", desc: "3+ errors within 10 minutes suggests the student is stuck. Periodic checks catch struggling students early." },
+      ]
+    }
+  };
+  const content = modalContent[feature.label];
+  if (!content) return null;
+
+  return (
+    <div onClick={onClose} style={{position:"fixed",inset:0,zIndex:100,background:"rgba(0,0,0,0.7)",backdropFilter:"blur(8px)",display:"flex",alignItems:"center",justifyContent:"center",padding:16,animation:"fadein 0.2s ease"}}>
+      <div onClick={e=>e.stopPropagation()} style={{background:"#0F172A",border:`1px solid ${feature.accent}35`,borderRadius:18,padding:"28px 24px",maxWidth:520,width:"100%",maxHeight:"80vh",overflowY:"auto",boxShadow:`0 24px 64px -16px rgba(0,0,0,0.6),0 0 0 1px ${feature.accent}20`}}>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:20}}>
+          <div style={{display:"flex",alignItems:"center",gap:10}}>
+            <div style={{width:40,height:40,borderRadius:10,background:feature.accentBg,display:"flex",alignItems:"center",justifyContent:"center",fontSize:20}}>{feature.icon}</div>
+            <div>
+              <div style={{fontSize:16,fontWeight:700,color:"#F1F5F9"}}>{content.title}</div>
+              <div style={{fontSize:11,color:"#64748B"}}>{feature.label}</div>
+            </div>
+          </div>
+          <button onClick={onClose} style={{width:30,height:30,borderRadius:8,border:"1px solid rgba(148,163,184,0.1)",background:"rgba(30,41,59,0.6)",color:"#94A3B8",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontSize:16}}>x</button>
+        </div>
+        <div style={{display:"grid",gap:8}}>
+          {content.sections.map((s,i) => (
+            <div key={i} style={{background:"rgba(30,41,59,0.5)",border:"1px solid rgba(148,163,184,0.07)",borderRadius:10,padding:"14px 16px",display:"flex",gap:12,alignItems:"flex-start"}}>
+              <span style={{fontSize:18,flexShrink:0,marginTop:2}}>{s.icon}</span>
+              <div>
+                <div style={{fontSize:13,fontWeight:600,color:"#E2E8F0",marginBottom:3}}>{s.name}</div>
+                <div style={{fontSize:12,color:"#94A3B8",lineHeight:1.6}}>{s.desc}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+        {content.formula && (
+          <div style={{marginTop:14,background:"rgba(30,41,59,0.5)",border:"1px solid rgba(148,163,184,0.07)",borderRadius:10,padding:"14px 16px"}}>
+            <div style={{fontSize:12,fontWeight:600,color:"#E2E8F0",marginBottom:8}}>Mastery Formula</div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6}}>
+              {[{l:"Exercises",w:"40%",c:"#3B82F6"},{l:"Quizzes",w:"30%",c:"#8B5CF6"},{l:"Code Quality",w:"20%",c:"#10B981"},{l:"Streak",w:"10%",c:"#F59E0B"}].map(m=>(
+                <div key={m.l} style={{display:"flex",alignItems:"center",gap:6}}>
+                  <div style={{width:8,height:8,borderRadius:99,background:m.c}}/>
+                  <span style={{fontSize:11,color:"#94A3B8"}}>{m.l}: <span style={{fontWeight:700,color:m.c}}>{m.w}</span></span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+        <button onClick={onClose} style={{marginTop:16,width:"100%",padding:"10px",borderRadius:10,border:"none",background:`${feature.accent}20`,color:feature.accent,fontWeight:600,fontSize:13,cursor:"pointer"}}>Got it</button>
+      </div>
+    </div>
+  );
+}
+
 function LandingPage({ onNavigate }) {
   const [hovered, setHovered] = useState(null);
   const [mobileMenu, setMobileMenu] = useState(false);
+  const [activeFeature, setActiveFeature] = useState(null);
 
   return (
     <div style={{ fontFamily:"'Inter',system-ui,sans-serif", minHeight:"100vh", background:"#0F172A", color:"#E2E8F0", overflowX:"hidden", position:"relative" }}>
@@ -274,13 +363,14 @@ function LandingPage({ onNavigate }) {
         </div>
         <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(220px,1fr))", gap:12 }}>
           {FEATURES.map((f,i)=>(
-            <div key={i} style={{ background:"rgba(15,23,42,0.6)", border:`1px solid ${f.accent}25`, borderRadius:14, padding:"22px 20px", backdropFilter:"blur(12px)", transition:"all 0.2s", cursor:"default" }}
+            <div key={i} onClick={()=>setActiveFeature(f)} style={{ background:"rgba(15,23,42,0.6)", border:`1px solid ${f.accent}25`, borderRadius:14, padding:"22px 20px", backdropFilter:"blur(12px)", transition:"all 0.2s", cursor:"pointer" }}
               onMouseEnter={e=>{ e.currentTarget.style.transform="translateY(-4px)"; e.currentTarget.style.borderColor=`${f.accent}45`; e.currentTarget.style.boxShadow=`0 12px 32px -8px rgba(0,0,0,0.4)`; }}
               onMouseLeave={e=>{ e.currentTarget.style.transform="translateY(0)"; e.currentTarget.style.borderColor=`${f.accent}25`; e.currentTarget.style.boxShadow="none"; }}
             >
               <div style={{ width:40, height:40, borderRadius:10, background:f.accentBg, display:"flex", alignItems:"center", justifyContent:"center", fontSize:20, marginBottom:14 }}>{f.icon}</div>
               <h3 style={{ fontSize:13, fontWeight:600, color:"#E2E8F0", marginBottom:7 }}>{f.label}</h3>
               <p style={{ fontSize:12, color:"#64748B", lineHeight:1.65 }}>{f.desc}</p>
+              <div style={{ marginTop:10, fontSize:10, fontWeight:600, color:f.accent, display:"flex", alignItems:"center", gap:4 }}>Learn more <span style={{fontSize:12}}>→</span></div>
             </div>
           ))}
         </div>
@@ -321,6 +411,8 @@ function LandingPage({ onNavigate }) {
         </div>
         <p style={{ fontSize:11, color:"#334155" }}>Powered by LearnFlow AI &nbsp;•&nbsp; Built with Claude Code &amp; Goose</p>
       </footer>
+
+      {activeFeature && <FeatureModal feature={activeFeature} onClose={()=>setActiveFeature(null)}/>}
     </div>
   );
 }
