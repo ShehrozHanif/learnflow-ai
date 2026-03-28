@@ -128,14 +128,14 @@ const FEATURES = [
   { accent:"#F59E0B", accentBg:"rgba(245,158,11,0.12)",  label:"Struggle Detection",     desc:"Teachers get real-time alerts the moment a student is stuck — before they give up.", icon:"🔔" },
 ];
 const MODULES = [
-  { n:"01", label:"Basics",          sub:"Variables & I/O"        },
-  { n:"02", label:"Control Flow",    sub:"Loops & Conditions"      },
-  { n:"03", label:"Data Structures", sub:"Lists, Dicts, Sets"      },
-  { n:"04", label:"Functions",       sub:"Scope & Return"          },
-  { n:"05", label:"OOP",             sub:"Classes & Inheritance"   },
-  { n:"06", label:"Files",           sub:"CSV & JSON"              },
-  { n:"07", label:"Error Handling",  sub:"Try/Except"              },
-  { n:"08", label:"Libraries",       sub:"pip & APIs"              },
+  { n:"01", label:"Basics",          sub:"Variables & I/O",        topics:["Variables","Data Types","Input/Output","Operators","String Formatting"], projects:["Calculator App","Greeting Generator"], lessons:5, quizzes:3, exercises:2, time:"2 hours" },
+  { n:"02", label:"Control Flow",    sub:"Loops & Conditions",     topics:["if/elif/else","for Loops","while Loops","break/continue","Nested Conditions"], projects:["Number Guessing Game","FizzBuzz"], lessons:6, quizzes:3, exercises:3, time:"2.5 hours" },
+  { n:"03", label:"Data Structures", sub:"Lists, Dicts, Sets",     topics:["Lists","Tuples","Dictionaries","Sets","List Comprehensions"], projects:["Contact Book","Word Counter"], lessons:6, quizzes:4, exercises:3, time:"3 hours" },
+  { n:"04", label:"Functions",       sub:"Scope & Return",         topics:["Defining Functions","Parameters & Arguments","Return Values","Scope","Lambda Functions"], projects:["Math Toolkit","Password Generator"], lessons:5, quizzes:3, exercises:2, time:"2 hours" },
+  { n:"05", label:"OOP",             sub:"Classes & Inheritance",  topics:["Classes","Objects","Inheritance","Encapsulation","Polymorphism"], projects:["Bank Account System","Animal Hierarchy"], lessons:7, quizzes:4, exercises:3, time:"3.5 hours" },
+  { n:"06", label:"Files",           sub:"CSV & JSON",             topics:["Reading Files","Writing Files","CSV Processing","JSON Handling","File Paths"], projects:["Log Analyzer","Data Converter"], lessons:5, quizzes:3, exercises:2, time:"2 hours" },
+  { n:"07", label:"Error Handling",  sub:"Try/Except",             topics:["try/except","Exception Types","Custom Exceptions","finally Block","Debugging Tips"], projects:["Input Validator","Safe Calculator"], lessons:4, quizzes:2, exercises:2, time:"1.5 hours" },
+  { n:"08", label:"Libraries",       sub:"pip & APIs",             topics:["pip Install","Popular Libraries","API Requests","JSON APIs","Virtual Environments"], projects:["Weather App","API Dashboard"], lessons:5, quizzes:3, exercises:2, time:"2.5 hours" },
 ];
 
 function FeatureModal({ feature, onClose }) {
@@ -230,6 +230,7 @@ function LandingPage({ onNavigate }) {
   const [hovered, setHovered] = useState(null);
   const [mobileMenu, setMobileMenu] = useState(false);
   const [activeFeature, setActiveFeature] = useState(null);
+  const [activeModule, setActiveModule] = useState(null);
 
   return (
     <div style={{ fontFamily:"'Inter',system-ui,sans-serif", minHeight:"100vh", background:"#0F172A", color:"#E2E8F0", overflowX:"hidden", position:"relative" }}>
@@ -388,13 +389,16 @@ function LandingPage({ onNavigate }) {
           </div>
           <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(160px,1fr))", gap:8 }}>
             {MODULES.map(m=>(
-              <div key={m.n} style={{ background:"rgba(30,41,59,0.8)", border:"1px solid rgba(148,163,184,0.06)", borderRadius:10, padding:"11px 13px", transition:"border-color 0.18s", cursor:"default" }}
-                onMouseEnter={e=>e.currentTarget.style.borderColor="rgba(59,130,246,0.2)"}
-                onMouseLeave={e=>e.currentTarget.style.borderColor="rgba(148,163,184,0.06)"}
+              <div key={m.n} onClick={()=>setActiveModule(m)} style={{ background:"rgba(30,41,59,0.8)", border:"1px solid rgba(148,163,184,0.06)", borderRadius:10, padding:"11px 13px", transition:"all 0.18s", cursor:"pointer" }}
+                onMouseEnter={e=>{e.currentTarget.style.borderColor="rgba(59,130,246,0.25)";e.currentTarget.style.transform="translateY(-2px)";}}
+                onMouseLeave={e=>{e.currentTarget.style.borderColor="rgba(148,163,184,0.06)";e.currentTarget.style.transform="translateY(0)";}}
               >
                 <span style={{ fontSize:10, fontFamily:"monospace", color:"rgba(59,130,246,0.5)", display:"block", marginBottom:3 }}>{m.n}</span>
                 <span style={{ fontSize:13, fontWeight:600, color:"#E2E8F0", display:"block", lineHeight:1.3 }}>{m.label}</span>
                 <span style={{ fontSize:11, color:"#475569" }}>{m.sub}</span>
+                <div style={{ marginTop:6, display:"flex", gap:8, fontSize:9, color:"#475569" }}>
+                  <span>{m.lessons} lessons</span><span>·</span><span>{m.quizzes} quizzes</span><span>·</span><span>{m.time}</span>
+                </div>
               </div>
             ))}
           </div>
@@ -413,6 +417,62 @@ function LandingPage({ onNavigate }) {
       </footer>
 
       {activeFeature && <FeatureModal feature={activeFeature} onClose={()=>setActiveFeature(null)}/>}
+
+      {activeModule && (
+        <div onClick={()=>setActiveModule(null)} style={{position:"fixed",inset:0,zIndex:100,background:"rgba(0,0,0,0.7)",backdropFilter:"blur(8px)",display:"flex",alignItems:"center",justifyContent:"center",padding:16,animation:"fadein 0.2s ease"}}>
+          <div onClick={e=>e.stopPropagation()} style={{background:"#0F172A",border:"1px solid rgba(59,130,246,0.2)",borderRadius:18,padding:"28px 24px",maxWidth:480,width:"100%",maxHeight:"80vh",overflowY:"auto",boxShadow:"0 24px 64px -16px rgba(0,0,0,0.6)"}}>
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:20}}>
+              <div style={{display:"flex",alignItems:"center",gap:12}}>
+                <div style={{width:40,height:40,borderRadius:10,background:"rgba(59,130,246,0.12)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,fontWeight:800,fontFamily:"monospace",color:"#60A5FA"}}>{activeModule.n}</div>
+                <div>
+                  <div style={{fontSize:16,fontWeight:700,color:"#F1F5F9"}}>{activeModule.label}</div>
+                  <div style={{fontSize:11,color:"#64748B"}}>{activeModule.sub}</div>
+                </div>
+              </div>
+              <button onClick={()=>setActiveModule(null)} style={{width:30,height:30,borderRadius:8,border:"1px solid rgba(148,163,184,0.1)",background:"rgba(30,41,59,0.6)",color:"#94A3B8",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontSize:16}}>x</button>
+            </div>
+
+            {/* Stats row */}
+            <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:6,marginBottom:16}}>
+              {[{v:activeModule.lessons,l:"Lessons",c:"#3B82F6"},{v:activeModule.quizzes,l:"Quizzes",c:"#8B5CF6"},{v:activeModule.exercises,l:"Exercises",c:"#10B981"},{v:activeModule.time,l:"Est. Time",c:"#F59E0B"}].map(s=>(
+                <div key={s.l} style={{background:"rgba(30,41,59,0.5)",borderRadius:8,padding:"10px 8px",textAlign:"center"}}>
+                  <div style={{fontSize:16,fontWeight:800,color:s.c}}>{s.v}</div>
+                  <div style={{fontSize:9,fontWeight:600,color:"#64748B",textTransform:"uppercase",marginTop:2}}>{s.l}</div>
+                </div>
+              ))}
+            </div>
+
+            {/* Topics */}
+            <div style={{marginBottom:16}}>
+              <div style={{fontSize:12,fontWeight:700,color:"#E2E8F0",marginBottom:8}}>Topics Covered</div>
+              <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+                {activeModule.topics.map(t=>(
+                  <span key={t} style={{fontSize:11,fontWeight:500,padding:"4px 10px",borderRadius:99,background:"rgba(59,130,246,0.08)",border:"1px solid rgba(59,130,246,0.15)",color:"#93C5FD"}}>{t}</span>
+                ))}
+              </div>
+            </div>
+
+            {/* Projects */}
+            <div style={{marginBottom:16}}>
+              <div style={{fontSize:12,fontWeight:700,color:"#E2E8F0",marginBottom:8}}>Hands-On Projects</div>
+              <div style={{display:"grid",gap:6}}>
+                {activeModule.projects.map(p=>(
+                  <div key={p} style={{display:"flex",alignItems:"center",gap:8,background:"rgba(30,41,59,0.5)",border:"1px solid rgba(148,163,184,0.07)",borderRadius:8,padding:"10px 12px"}}>
+                    <span style={{fontSize:14}}>🛠️</span>
+                    <span style={{fontSize:12,fontWeight:600,color:"#E2E8F0"}}>{p}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* CTA */}
+            <button onClick={()=>{setActiveModule(null);onNavigate("login");}} style={{width:"100%",padding:"11px",borderRadius:10,border:"none",background:"linear-gradient(135deg,#1D4ED8,#2563EB)",color:"white",fontWeight:600,fontSize:13,cursor:"pointer",transition:"opacity 0.15s"}}
+              onMouseEnter={e=>e.currentTarget.style.opacity="0.9"} onMouseLeave={e=>e.currentTarget.style.opacity="1"}>
+              Start Learning {activeModule.label}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
