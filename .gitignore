@@ -8,6 +8,7 @@ venv/
 
 # Node.js (if added later)
 node_modules/
+.next/
 dist/
 build/
 

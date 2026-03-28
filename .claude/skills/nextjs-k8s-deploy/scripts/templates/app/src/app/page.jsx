@@ -560,6 +560,7 @@ function StudentDashboard({ user }) {
   const [execStats, setExecStats] = useState({ total: 0, successes: 0, streak: 0, active_days: 0 });
   const [dataLoading, setDataLoading] = useState(!isDemo);
   const [toast, setToast] = useState(null);
+  const [expandedTopic, setExpandedTopic] = useState(null);
   const chatEnd = useRef(null);
   useEffect(()=>{ chatEnd.current?.scrollIntoView({behavior:"smooth"}); },[msgs,typing]);
 
@@ -916,16 +917,43 @@ function StudentDashboard({ user }) {
               </div>
             </div>
             <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(190px,1fr))",gap:9}}>
-              {topics.map(t=>{const ls=LEVEL[t.level]||LEVEL.Beginner;return(
-                <div key={t.name} style={{background:"rgba(30,41,59,0.4)",border:"1px solid rgba(148,163,184,0.07)",borderRadius:11,padding:"12px 13px"}}>
+              {topics.map(t=>{const ls=LEVEL[t.level]||LEVEL.Beginner;const isExp=expandedTopic===t.name;return(
+                <div key={t.name} onClick={()=>setExpandedTopic(isExp?null:t.name)} style={{background:isExp?"rgba(30,41,59,0.6)":"rgba(30,41,59,0.4)",border:`1px solid ${isExp?ls.border:"rgba(148,163,184,0.07)"}`,borderRadius:11,padding:"12px 13px",cursor:"pointer",transition:"all 0.2s ease",gridColumn:isExp?"1 / -1":"auto"}}>
                   <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
                     <span style={{fontSize:13,fontWeight:600,color:"#E2E8F0"}}>{t.name}</span>
-                    <span style={{fontSize:9,fontWeight:700,padding:"2px 6px",borderRadius:99,color:ls.color,background:ls.bg,border:`1px solid ${ls.border}`}}>{ls.label}</span>
+                    <div style={{display:"flex",alignItems:"center",gap:6}}>
+                      <span style={{fontSize:9,fontWeight:700,padding:"2px 6px",borderRadius:99,color:ls.color,background:ls.bg,border:`1px solid ${ls.border}`}}>{ls.label}</span>
+                      <span style={{fontSize:10,color:"#64748B",transition:"transform 0.2s",transform:isExp?"rotate(180deg)":"rotate(0deg)"}}>▼</span>
+                    </div>
                   </div>
                   <div style={{display:"flex",alignItems:"center",gap:7}}>
                     <div style={{flex:1,height:3,borderRadius:99,background:"rgba(148,163,184,0.08)",overflow:"hidden"}}><div style={{height:"100%",width:`${t.pct}%`,borderRadius:99,background:ls.bar}}/></div>
                     <span style={{fontSize:12,fontWeight:700,color:ls.color,width:30,textAlign:"right"}}>{t.pct}%</span>
                   </div>
+                  {isExp&&(
+                    <div style={{marginTop:12,paddingTop:12,borderTop:"1px solid rgba(148,163,184,0.1)"}}>
+                      <div style={{fontSize:11,fontWeight:600,color:"#94A3B8",marginBottom:8,textTransform:"uppercase",letterSpacing:"0.05em"}}>Mastery Breakdown</div>
+                      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+                        {[
+                          {label:"Exercises",value:t.exercises_completed||0,weight:"40%",color:"#3B82F6"},
+                          {label:"Quizzes",value:t.quiz_score||0,weight:"30%",color:"#8B5CF6"},
+                          {label:"Code Quality",value:t.code_quality||0,weight:"20%",color:"#10B981"},
+                          {label:"Streak",value:Math.min((t.streak||0)*10,100),weight:"10%",color:"#F59E0B"},
+                        ].map(m=>(
+                          <div key={m.label} style={{background:"rgba(15,23,42,0.5)",borderRadius:8,padding:"8px 10px"}}>
+                            <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
+                              <span style={{fontSize:11,color:"#94A3B8"}}>{m.label}</span>
+                              <span style={{fontSize:11,fontWeight:700,color:m.color}}>{m.value}%</span>
+                            </div>
+                            <div style={{height:3,borderRadius:99,background:"rgba(148,163,184,0.08)",overflow:"hidden"}}>
+                              <div style={{height:"100%",width:`${m.value}%`,borderRadius:99,background:m.color,transition:"width 0.3s ease"}}/>
+                            </div>
+                            <div style={{fontSize:9,color:"#475569",marginTop:3}}>Weight: {m.weight}</div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               );})}
             </div>
