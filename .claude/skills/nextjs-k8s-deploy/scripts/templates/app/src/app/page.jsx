@@ -1347,6 +1347,332 @@ function TeacherDashboard({ user }) {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
+// PROGRESS PAGE (Sidebar)
+// ══════════════════════════════════════════════════════════════════════════════
+function TeacherProgressPage({ user }) {
+  const token = typeof window !== "undefined" ? localStorage.getItem("lf_token") : null;
+  const authHeaders = token ? { Authorization: `Bearer ${token}` } : {};
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [expandedSection, setExpandedSection] = useState(null);
+
+  useEffect(() => {
+    fetch("/api/teacher/class-progress", { headers: authHeaders })
+      .then(r => r.json()).then(d => { if (!d.error) setData(d); })
+      .catch(() => {}).finally(() => setLoading(false));
+  }, []);
+
+  if (loading) return <div style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:12}}><LoadingSpinner size={28} color="#3B82F6"/><span style={{fontSize:12,color:"#64748B"}}>Loading class analytics...</span></div>;
+  if (!data) return <div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",color:"#64748B"}}>Failed to load class data</div>;
+
+  const o = data.overview;
+  const dist = data.distribution;
+  const totalInDist = dist.Beginner + dist.Learning + dist.Proficient + dist.Mastered;
+  const distColors = { Beginner: "#F43F5E", Learning: "#FBBF24", Proficient: "#10B981", Mastered: "#3B82F6" };
+
+  return (
+    <div style={{flex:1,overflowY:"auto",padding:"20px 14px"}}>
+      <div style={{maxWidth:700,margin:"0 auto"}}>
+        <div style={{fontSize:18,fontWeight:800,color:"#F1F5F9",marginBottom:16}}>Class Analytics</div>
+
+        {/* Overview Stats */}
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(130px,1fr))",gap:8,marginBottom:20}}>
+          {[
+            {e:"\ud83d\udc65",v:String(o.total_students),l:"Students",sub:"Total enrolled"},
+            {e:"\ud83c\udfaf",v:o.avg_mastery+"%",l:"Avg Mastery",sub:"Class average"},
+            {e:"\ud83d\udcdd",v:String(o.total_exercises),l:"Exercises",sub:"Total assigned"},
+            {e:"\ud83d\udccb",v:String(o.total_quizzes),l:"Quizzes",sub:"Total created"},
+          ].map(s=>(
+            <div key={s.l} style={{background:"rgba(30,41,59,0.5)",border:"1px solid rgba(148,163,184,0.07)",borderRadius:12,padding:"16px",textAlign:"center"}}>
+              <div style={{fontSize:18,marginBottom:6}}>{s.e}</div>
+              <div style={{fontSize:22,fontWeight:800,color:"#E2E8F0"}}>{s.v}</div>
+              <div style={{fontSize:10,fontWeight:600,color:"#64748B",textTransform:"uppercase",marginTop:2}}>{s.l}</div>
+              <div style={{fontSize:9,color:"#475569",marginTop:1}}>{s.sub}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* Mastery Distribution */}
+        <div style={{fontSize:14,fontWeight:700,color:"#F1F5F9",marginBottom:10}}>Mastery Distribution</div>
+        <div style={{background:"rgba(30,41,59,0.5)",border:"1px solid rgba(148,163,184,0.07)",borderRadius:12,padding:"16px",marginBottom:20}}>
+          {totalInDist > 0 ? (
+            <>
+              <div style={{display:"flex",height:24,borderRadius:8,overflow:"hidden",marginBottom:12}}>
+                {Object.entries(dist).map(([level, count]) => count > 0 ? (
+                  <div key={level} style={{width:`${(count/totalInDist)*100}%`,background:distColors[level],display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,fontWeight:700,color:"#fff",minWidth:count>0?20:0}}>{count}</div>
+                ) : null)}
+              </div>
+              <div style={{display:"flex",flexWrap:"wrap",gap:12}}>
+                {Object.entries(dist).map(([level, count]) => (
+                  <div key={level} style={{display:"flex",alignItems:"center",gap:6}}>
+                    <div style={{width:8,height:8,borderRadius:99,background:distColors[level]}}/>
+                    <span style={{fontSize:11,color:"#94A3B8"}}>{level}: <span style={{fontWeight:700,color:"#E2E8F0"}}>{count}</span></span>
+                  </div>
+                ))}
+              </div>
+            </>
+          ) : <div style={{fontSize:12,color:"#64748B",textAlign:"center",padding:8}}>No student data yet</div>}
+        </div>
+
+        {/* Per-Topic Class Performance */}
+        <div style={{fontSize:14,fontWeight:700,color:"#F1F5F9",marginBottom:10}}>Topic Performance (Class Average)</div>
+        <div style={{display:"grid",gap:6,marginBottom:20}}>
+          {data.topics.length > 0 ? data.topics.map(t => {
+            const lvl = t.avg_score >= 91 ? "Mastered" : t.avg_score >= 71 ? "Proficient" : t.avg_score >= 41 ? "Learning" : "Beginner";
+            const ls = LEVEL[lvl] || LEVEL.Beginner;
+            return (
+              <div key={t.topic} style={{background:"rgba(30,41,59,0.4)",border:"1px solid rgba(148,163,184,0.07)",borderRadius:10,padding:"12px 14px"}}>
+                <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:6}}>
+                  <span style={{fontSize:13,fontWeight:600,color:"#E2E8F0"}}>{t.topic}</span>
+                  <div style={{display:"flex",alignItems:"center",gap:6}}>
+                    <span style={{fontSize:9,color:"#64748B"}}>{t.student_count} students</span>
+                    <span style={{fontSize:9,fontWeight:700,padding:"2px 6px",borderRadius:99,color:ls.color,background:ls.bg,border:`1px solid ${ls.border}`}}>{ls.label}</span>
+                  </div>
+                </div>
+                <div style={{display:"flex",alignItems:"center",gap:8}}>
+                  <div style={{flex:1,height:4,borderRadius:99,background:"rgba(148,163,184,0.08)",overflow:"hidden"}}>
+                    <div style={{height:"100%",width:`${t.avg_score}%`,borderRadius:99,background:ls.bar,transition:"width 0.3s"}}/>
+                  </div>
+                  <span style={{fontSize:12,fontWeight:700,color:ls.color,width:35,textAlign:"right"}}>{t.avg_score}%</span>
+                </div>
+              </div>
+            );
+          }) : <div style={{fontSize:12,color:"#64748B",textAlign:"center",padding:12}}>No topic data yet</div>}
+        </div>
+
+        {/* Top Performers & Struggling — side by side */}
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:20}}>
+          <div>
+            <div style={{fontSize:14,fontWeight:700,color:"#F1F5F9",marginBottom:8}}>Top Performers</div>
+            <div style={{background:"rgba(30,41,59,0.4)",border:"1px solid rgba(148,163,184,0.07)",borderRadius:10,padding:"10px"}}>
+              {data.top_performers.length > 0 ? data.top_performers.map((s,i) => (
+                <div key={s.id} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 4px",borderBottom:i<data.top_performers.length-1?"1px solid rgba(148,163,184,0.06)":"none"}}>
+                  <span style={{fontSize:12,fontWeight:700,color:i===0?"#FBBF24":i===1?"#94A3B8":i===2?"#CD7F32":"#64748B",width:16}}>{i+1}.</span>
+                  <span style={{fontSize:12,fontWeight:600,color:"#E2E8F0",flex:1}}>{s.name}</span>
+                  <span style={{fontSize:11,fontWeight:700,color:"#10B981"}}>{s.avg_mastery}%</span>
+                </div>
+              )) : <div style={{fontSize:11,color:"#64748B",textAlign:"center",padding:8}}>No data yet</div>}
+            </div>
+          </div>
+          <div>
+            <div style={{fontSize:14,fontWeight:700,color:"#F1F5F9",marginBottom:8}}>Need Attention</div>
+            <div style={{background:"rgba(30,41,59,0.4)",border:"1px solid rgba(148,163,184,0.07)",borderRadius:10,padding:"10px"}}>
+              {data.struggling.length > 0 ? data.struggling.map((s,i) => (
+                <div key={s.id} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 4px",borderBottom:i<data.struggling.length-1?"1px solid rgba(148,163,184,0.06)":"none"}}>
+                  <span style={{fontSize:12,fontWeight:600,color:"#E2E8F0",flex:1}}>{s.name}</span>
+                  <span style={{fontSize:11,fontWeight:700,color:"#F43F5E"}}>{s.avg_mastery}%</span>
+                  {s.alert_count > 0 && <span style={{fontSize:9,fontWeight:700,padding:"1px 5px",borderRadius:99,background:"rgba(244,63,94,0.15)",color:"#FB7185"}}>{s.alert_count} alerts</span>}
+                </div>
+              )) : <div style={{fontSize:11,color:"#64748B",textAlign:"center",padding:8}}>No struggling students</div>}
+            </div>
+          </div>
+        </div>
+
+        {/* Recent Activity */}
+        <div style={{fontSize:14,fontWeight:700,color:"#F1F5F9",marginBottom:10}}>Recent Activity</div>
+        <div style={{display:"grid",gap:6,marginBottom:20}}>
+          {[...data.recent_quizzes.map(q => ({type:"quiz",name:q.student,detail:`${q.topic} - ${q.score}/${q.total}`,date:q.date,color:"#8B5CF6"})),
+            ...data.recent_exercises.map(e => ({type:"exercise",name:e.student,detail:`${e.title||e.topic} - ${e.status}${e.grade?` (${e.grade}%)`:""  }`,date:e.date,color:"#3B82F6"}))
+          ].sort((a,b) => new Date(b.date) - new Date(a.date)).slice(0,10).map((item,i) => (
+            <div key={i} style={{display:"flex",alignItems:"center",gap:10,background:"rgba(30,41,59,0.4)",border:"1px solid rgba(148,163,184,0.07)",borderRadius:9,padding:"10px 14px"}}>
+              <span style={{fontSize:9,fontWeight:700,padding:"2px 6px",borderRadius:6,background:item.type==="quiz"?"rgba(139,92,246,0.12)":"rgba(59,130,246,0.12)",color:item.color}}>{item.type}</span>
+              <span style={{fontSize:12,fontWeight:600,color:"#E2E8F0"}}>{item.name}</span>
+              <span style={{fontSize:11,color:"#94A3B8",flex:1}}>{item.detail}</span>
+              <span style={{fontSize:10,color:"#64748B"}}>{item.date?new Date(item.date).toLocaleDateString():""}</span>
+            </div>
+          ))}
+          {data.recent_quizzes.length === 0 && data.recent_exercises.length === 0 && (
+            <div style={{fontSize:12,color:"#64748B",textAlign:"center",padding:12}}>No recent activity yet</div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ProgressPage({ user, role }) {
+  const token = typeof window !== "undefined" ? localStorage.getItem("lf_token") : null;
+  const authHeaders = token ? { Authorization: `Bearer ${token}` } : {};
+  const [topics, setTopics] = useState([]);
+  const [execStats, setExecStats] = useState({ total: 0, successes: 0, streak: 0, active_days: 0 });
+  const [quizHistory, setQuizHistory] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [expandedTopic, setExpandedTopic] = useState(null);
+
+  useEffect(() => {
+    let loaded = 0;
+    const done = () => { loaded++; if (loaded >= 3) setLoading(false); };
+    fetch("/api/progress", { headers: authHeaders }).then(r => r.json()).then(d => { if (d && d.topics) setTopics(d.topics); }).catch(() => {}).finally(done);
+    fetch("/api/submissions", { headers: authHeaders }).then(r => r.json()).then(d => { if (d && d.stats) setExecStats(d.stats); }).catch(() => {}).finally(done);
+    fetch("/api/quizzes", { headers: authHeaders }).then(r => r.json()).then(d => { if (d && d.quizzes) setQuizHistory(d.quizzes); }).catch(() => {}).finally(done);
+  }, []);
+
+  if (role === "teacher") return <TeacherProgressPage user={user} />;
+
+  if (loading) return <div style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:12}}><LoadingSpinner size={28} color="#3B82F6"/><span style={{fontSize:12,color:"#64748B"}}>Loading progress...</span></div>;
+
+  const avgMastery = topics.length ? Math.round(topics.reduce((a, t) => a + t.pct, 0) / topics.length) : 0;
+  const topicsStarted = topics.filter(t => t.pct > 0).length;
+  const successRate = execStats.total ? Math.round(execStats.successes / execStats.total * 100) : 0;
+
+  return (
+    <div style={{flex:1,overflowY:"auto",padding:"20px 14px"}}>
+      <div style={{maxWidth:700,margin:"0 auto"}}>
+        <div style={{fontSize:18,fontWeight:800,color:"#F1F5F9",marginBottom:16}}>Your Progress</div>
+        <div style={{display:"flex",gap:14,marginBottom:20,flexWrap:"wrap"}}>
+          <div style={{flex:1,minWidth:140,background:"rgba(30,41,59,0.5)",borderRadius:14,padding:"18px",display:"flex",alignItems:"center",gap:14}}>
+            <div style={{position:"relative",width:72,height:72,flexShrink:0}}>
+              <Ring pct={avgMastery} size={72} stroke={6}/>
+              <div style={{position:"absolute",inset:0,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center"}}>
+                <span style={{fontSize:18,fontWeight:800,color:"#F1F5F9"}}>{avgMastery}%</span>
+              </div>
+            </div>
+            <div>
+              <div style={{fontSize:14,fontWeight:700,color:"#F1F5F9"}}>{user?.name || "Student"}</div>
+              <div style={{fontSize:11,color:"#64748B"}}>{topicsStarted} of {topics.length} topics started</div>
+              <div style={{fontSize:11,color:"#64748B",marginTop:2}}>Level: {avgMastery >= 91 ? "Mastered" : avgMastery >= 71 ? "Proficient" : avgMastery >= 41 ? "Learning" : "Beginner"}</div>
+            </div>
+          </div>
+        </div>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(120px,1fr))",gap:8,marginBottom:20}}>
+          {[
+            {e:"🔥",v:execStats.streak+"d",l:"Streak",sub:"Consecutive days"},
+            {e:"📝",v:String(execStats.total),l:"Code Runs",sub:"Total executions"},
+            {e:"✅",v:successRate+"%",l:"Success Rate",sub:`${execStats.successes} passed`},
+            {e:"📅",v:String(execStats.active_days),l:"Active Days",sub:"Total days active"},
+            {e:"📚",v:String(topicsStarted),l:"Topics",sub:`of ${topics.length} total`},
+            {e:"🏆",v:String(quizHistory.length),l:"Quizzes",sub:"Attempted"},
+          ].map(s=>(
+            <div key={s.l} style={{background:"rgba(30,41,59,0.4)",border:"1px solid rgba(148,163,184,0.07)",borderRadius:10,padding:"12px",textAlign:"center"}}>
+              <div style={{fontSize:16,marginBottom:4}}>{s.e}</div>
+              <div style={{fontSize:18,fontWeight:800,color:"#E2E8F0"}}>{s.v}</div>
+              <div style={{fontSize:10,fontWeight:600,color:"#64748B",textTransform:"uppercase"}}>{s.l}</div>
+              <div style={{fontSize:9,color:"#475569",marginTop:1}}>{s.sub}</div>
+            </div>
+          ))}
+        </div>
+        <div style={{fontSize:14,fontWeight:700,color:"#F1F5F9",marginBottom:10}}>Topic Breakdown</div>
+        <div style={{display:"grid",gap:8,marginBottom:20}}>
+          {topics.map(t => {const ls=LEVEL[t.level]||LEVEL.Beginner;const isExp=expandedTopic===t.name;return(
+            <div key={t.name} onClick={()=>setExpandedTopic(isExp?null:t.name)} style={{background:isExp?"rgba(30,41,59,0.6)":"rgba(30,41,59,0.4)",border:`1px solid ${isExp?ls.border:"rgba(148,163,184,0.07)"}`,borderRadius:11,padding:"14px 16px",cursor:"pointer",transition:"all 0.2s ease"}}>
+              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
+                <span style={{fontSize:14,fontWeight:600,color:"#E2E8F0"}}>{t.name}</span>
+                <div style={{display:"flex",alignItems:"center",gap:6}}>
+                  <span style={{fontSize:9,fontWeight:700,padding:"2px 6px",borderRadius:99,color:ls.color,background:ls.bg,border:`1px solid ${ls.border}`}}>{ls.label}</span>
+                  <span style={{fontSize:10,color:"#64748B",transition:"transform 0.2s",transform:isExp?"rotate(180deg)":"rotate(0deg)"}}>▼</span>
+                </div>
+              </div>
+              <div style={{display:"flex",alignItems:"center",gap:8}}>
+                <div style={{flex:1,height:4,borderRadius:99,background:"rgba(148,163,184,0.08)",overflow:"hidden"}}><div style={{height:"100%",width:`${t.pct}%`,borderRadius:99,background:ls.bar,transition:"width 0.3s"}}/></div>
+                <span style={{fontSize:13,fontWeight:700,color:ls.color,width:35,textAlign:"right"}}>{t.pct}%</span>
+              </div>
+              {isExp&&(
+                <div style={{marginTop:12,paddingTop:12,borderTop:"1px solid rgba(148,163,184,0.1)"}}>
+                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+                    {[
+                      {label:"Exercises",value:t.exercises_completed||0,weight:"40%",color:"#3B82F6"},
+                      {label:"Quizzes",value:t.quiz_score||0,weight:"30%",color:"#8B5CF6"},
+                      {label:"Code Quality",value:t.code_quality||0,weight:"20%",color:"#10B981"},
+                      {label:"Streak",value:Math.min((t.streak||0)*10,100),weight:"10%",color:"#F59E0B"},
+                    ].map(m=>(
+                      <div key={m.label} style={{background:"rgba(15,23,42,0.5)",borderRadius:8,padding:"8px 10px"}}>
+                        <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
+                          <span style={{fontSize:11,color:"#94A3B8"}}>{m.label}</span>
+                          <span style={{fontSize:11,fontWeight:700,color:m.color}}>{m.value}%</span>
+                        </div>
+                        <div style={{height:3,borderRadius:99,background:"rgba(148,163,184,0.08)",overflow:"hidden"}}>
+                          <div style={{height:"100%",width:`${m.value}%`,borderRadius:99,background:m.color,transition:"width 0.3s ease"}}/>
+                        </div>
+                        <div style={{fontSize:9,color:"#475569",marginTop:3}}>Weight: {m.weight}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          );})}
+        </div>
+        {quizHistory.length>0&&(<>
+          <div style={{fontSize:14,fontWeight:700,color:"#F1F5F9",marginBottom:10}}>Quiz History</div>
+          <div style={{display:"grid",gap:6,marginBottom:20}}>
+            {quizHistory.slice(0,10).map((q,i)=>(
+              <div key={q.id||i} style={{display:"flex",alignItems:"center",gap:10,background:"rgba(30,41,59,0.4)",border:"1px solid rgba(148,163,184,0.07)",borderRadius:9,padding:"10px 14px"}}>
+                <span style={{fontSize:13,fontWeight:600,color:"#E2E8F0",flex:1}}>{q.topic||"General"}</span>
+                <span style={{fontSize:10,padding:"2px 6px",borderRadius:6,background:q.difficulty==="advanced"?"rgba(244,63,94,0.1)":q.difficulty==="intermediate"?"rgba(251,191,36,0.1)":"rgba(52,211,153,0.1)",color:q.difficulty==="advanced"?"#FB7185":q.difficulty==="intermediate"?"#FBBF24":"#34D399",fontWeight:600}}>{q.difficulty||"beginner"}</span>
+                <span style={{fontSize:12,color:"#64748B"}}>{q.created_at?new Date(q.created_at).toLocaleDateString():""}</span>
+              </div>
+            ))}
+          </div>
+        </>)}
+      </div>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// SETTINGS PAGE (Sidebar)
+// ══════════════════════════════════════════════════════════════════════════════
+function SettingsPage({ user, role }) {
+  const [darkMode, setDarkMode] = useState(true);
+  const [fontSize, setFontSize] = useState(14);
+  const [toast, setToast] = useState(null);
+
+  return (
+    <div style={{flex:1,overflowY:"auto",padding:"20px 14px"}}>
+      {toast&&<Toast message={toast.message} type={toast.type} onClose={()=>setToast(null)}/>}
+      <div style={{maxWidth:500,margin:"0 auto"}}>
+        <div style={{fontSize:18,fontWeight:800,color:"#F1F5F9",marginBottom:20}}>Settings</div>
+        <div style={{background:"rgba(30,41,59,0.4)",border:"1px solid rgba(148,163,184,0.07)",borderRadius:14,padding:"20px",marginBottom:14}}>
+          <div style={{fontSize:13,fontWeight:700,color:"#E2E8F0",marginBottom:14}}>Profile</div>
+          <div style={{display:"grid",gap:10}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+              <span style={{fontSize:12,color:"#94A3B8"}}>Name</span>
+              <span style={{fontSize:12,fontWeight:600,color:"#E2E8F0"}}>{user?.name || "User"}</span>
+            </div>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+              <span style={{fontSize:12,color:"#94A3B8"}}>Email</span>
+              <span style={{fontSize:12,fontWeight:600,color:"#E2E8F0"}}>{user?.email || "—"}</span>
+            </div>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+              <span style={{fontSize:12,color:"#94A3B8"}}>Role</span>
+              <span style={{fontSize:12,fontWeight:600,color:"#E2E8F0",textTransform:"capitalize"}}>{role}</span>
+            </div>
+          </div>
+        </div>
+        <div style={{background:"rgba(30,41,59,0.4)",border:"1px solid rgba(148,163,184,0.07)",borderRadius:14,padding:"20px",marginBottom:14}}>
+          <div style={{fontSize:13,fontWeight:700,color:"#E2E8F0",marginBottom:14}}>Appearance</div>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+            <span style={{fontSize:12,color:"#94A3B8"}}>Dark Mode</span>
+            <div onClick={()=>{setDarkMode(!darkMode);setToast({message:darkMode?"Light mode coming soon!":"Dark mode active",type:"info"});}} style={{width:40,height:22,borderRadius:99,background:darkMode?"#3B82F6":"rgba(148,163,184,0.2)",cursor:"pointer",padding:2,transition:"background 0.2s"}}>
+              <div style={{width:18,height:18,borderRadius:"50%",background:"white",transform:darkMode?"translateX(18px)":"translateX(0)",transition:"transform 0.2s"}}/>
+            </div>
+          </div>
+        </div>
+        <div style={{background:"rgba(30,41,59,0.4)",border:"1px solid rgba(148,163,184,0.07)",borderRadius:14,padding:"20px",marginBottom:14}}>
+          <div style={{fontSize:13,fontWeight:700,color:"#E2E8F0",marginBottom:14}}>Code Editor</div>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+            <span style={{fontSize:12,color:"#94A3B8"}}>Font Size</span>
+            <div style={{display:"flex",alignItems:"center",gap:8}}>
+              <button onClick={()=>setFontSize(Math.max(10,fontSize-1))} style={{width:26,height:26,borderRadius:6,border:"1px solid rgba(148,163,184,0.15)",background:"transparent",color:"#94A3B8",cursor:"pointer",fontSize:14}}>−</button>
+              <span style={{fontSize:13,fontWeight:700,color:"#E2E8F0",width:24,textAlign:"center"}}>{fontSize}</span>
+              <button onClick={()=>setFontSize(Math.min(24,fontSize+1))} style={{width:26,height:26,borderRadius:6,border:"1px solid rgba(148,163,184,0.15)",background:"transparent",color:"#94A3B8",cursor:"pointer",fontSize:14}}>+</button>
+            </div>
+          </div>
+        </div>
+        <div style={{background:"rgba(30,41,59,0.4)",border:"1px solid rgba(148,163,184,0.07)",borderRadius:14,padding:"20px"}}>
+          <div style={{fontSize:13,fontWeight:700,color:"#E2E8F0",marginBottom:14}}>About</div>
+          <div style={{display:"grid",gap:8}}>
+            <div style={{display:"flex",justifyContent:"space-between"}}><span style={{fontSize:12,color:"#94A3B8"}}>App</span><span style={{fontSize:12,color:"#E2E8F0"}}>LearnFlow v1.0</span></div>
+            <div style={{display:"flex",justifyContent:"space-between"}}><span style={{fontSize:12,color:"#94A3B8"}}>AI Model</span><span style={{fontSize:12,color:"#E2E8F0"}}>GPT-4o-mini</span></div>
+            <div style={{display:"flex",justifyContent:"space-between"}}><span style={{fontSize:12,color:"#94A3B8"}}>Stack</span><span style={{fontSize:12,color:"#E2E8F0"}}>Next.js + K8s + Kafka</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
 // APP SHELL
 // ══════════════════════════════════════════════════════════════════════════════
 function AppShell({ role, user, onLogout }) {
@@ -1389,13 +1715,8 @@ function AppShell({ role, user, onLogout }) {
         <div style={{flex:1,overflow:"hidden",display:"flex",flexDirection:"column"}}>
           {activePage==="dashboard"&&role==="student"&&<StudentDashboard user={user}/>}
           {activePage==="dashboard"&&role==="teacher"&&<TeacherDashboard user={user}/>}
-          {activePage!=="dashboard"&&(
-            <div style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:10,color:"#334155"}}>
-              <div style={{fontSize:32}}>{activePage==="progress"?"📈":"⚙️"}</div>
-              <div style={{fontSize:15,fontWeight:600,color:"#64748B",textTransform:"capitalize"}}>{activePage}</div>
-              <div style={{fontSize:12,color:"#334155"}}>Connect your {activePage} component here</div>
-            </div>
-          )}
+          {activePage==="progress"&&<ProgressPage user={user} role={role}/>}
+          {activePage==="settings"&&<SettingsPage user={user} role={role}/>}
         </div>
       </div>
     </div>
