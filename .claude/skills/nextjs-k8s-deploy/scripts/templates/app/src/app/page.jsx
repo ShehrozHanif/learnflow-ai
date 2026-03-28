@@ -988,6 +988,24 @@ function TeacherDashboard({ user }) {
   const [genQuiz,setGenQuiz]=useState(false);
   const [genQuizResult,setGenQuizResult]=useState(null);
   const [statsExpanded,setStatsExpanded]=useState(null);
+  const [studentDetail,setStudentDetail]=useState(null);
+  const [detailLoading,setDetailLoading]=useState(false);
+
+  const openStudentDetail = async (studentId) => {
+    if(isDemo) return;
+    setDetailLoading(true);
+    setStudentDetail(null);
+    try {
+      const res = await fetch(`/api/teacher/student-detail?id=${studentId}`,{headers:authHeaders});
+      if(!res.ok) throw new Error("Failed to load");
+      const data = await res.json();
+      setStudentDetail(data);
+    } catch(e) {
+      setToast({message:e.message||"Failed to load student details",type:"error"});
+      setDetailLoading(false);
+    }
+    setDetailLoading(false);
+  };
 
   const ALERT_TYPE_LABELS = {
     repeated_error: { label: "Repeated Errors", color: "#F43F5E", bg: "rgba(244,63,94,0.1)" },
@@ -1074,6 +1092,76 @@ function TeacherDashboard({ user }) {
           </div>
         </div>
       </div>}
+      {(studentDetail||detailLoading)&&<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.7)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center",padding:20}} onClick={()=>{setStudentDetail(null);setDetailLoading(false);}}>
+        <div onClick={e=>e.stopPropagation()} style={{background:"#1E293B",border:"1px solid rgba(148,163,184,0.15)",borderRadius:16,padding:0,maxWidth:600,width:"100%",maxHeight:"85vh",overflowY:"auto"}}>
+          {detailLoading&&!studentDetail?<div style={{padding:40,textAlign:"center"}}><LoadingSpinner size={28} color="#3B82F6"/><div style={{fontSize:12,color:"#64748B",marginTop:8}}>Loading student profile...</div></div>
+          :studentDetail&&(<>
+            <div style={{padding:"20px 24px",borderBottom:"1px solid rgba(148,163,184,0.1)",display:"flex",alignItems:"center",gap:12}}>
+              <Avatar initials={studentDetail.student.name.split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase()} color="#3B82F6" size={42}/>
+              <div style={{flex:1}}>
+                <div style={{fontSize:16,fontWeight:700,color:"#F1F5F9"}}>{studentDetail.student.name}</div>
+                <div style={{fontSize:11,color:"#64748B"}}>{studentDetail.student.email} — Joined {new Date(studentDetail.student.joined).toLocaleDateString()}</div>
+              </div>
+              {studentDetail.stuck_topics.length>0&&<span style={{fontSize:10,fontWeight:700,padding:"3px 8px",borderRadius:99,background:"rgba(244,63,94,0.12)",color:"#FB7185",border:"1px solid rgba(244,63,94,0.25)"}}>Struggling</span>}
+              <button onClick={()=>{setStudentDetail(null);setDetailLoading(false);}} style={{padding:"4px 8px",borderRadius:6,border:"1px solid rgba(148,163,184,0.15)",background:"transparent",color:"#64748B",fontSize:14,cursor:"pointer"}}>✕</button>
+            </div>
+            <div style={{padding:"16px 24px"}}>
+              <div style={{display:"flex",gap:10,marginBottom:16,flexWrap:"wrap"}}>
+                {[
+                  {l:"Avg Mastery",v:studentDetail.progress.length?Math.round(studentDetail.progress.reduce((a,p)=>a+p.pct,0)/studentDetail.progress.length)+"%":"0%",c:"#3B82F6"},
+                  {l:"Topics",v:`${studentDetail.progress.filter(p=>p.pct>0).length}/${studentDetail.progress.length}`,c:"#8B5CF6"},
+                  {l:"Quizzes",v:String(studentDetail.quiz_attempts.length),c:"#10B981"},
+                  {l:"Exercises",v:String(studentDetail.exercises.length),c:"#F59E0B"},
+                ].map(s=>(
+                  <div key={s.l} style={{flex:1,minWidth:80,background:"rgba(15,23,42,0.5)",borderRadius:9,padding:"10px",textAlign:"center"}}>
+                    <div style={{fontSize:18,fontWeight:800,color:s.c}}>{s.v}</div>
+                    <div style={{fontSize:9,color:"#475569",textTransform:"uppercase"}}>{s.l}</div>
+                  </div>
+                ))}
+              </div>
+              {studentDetail.stuck_topics.length>0&&(
+                <div style={{background:"rgba(244,63,94,0.08)",border:"1px solid rgba(244,63,94,0.2)",borderRadius:10,padding:"10px 14px",marginBottom:16}}>
+                  <div style={{fontSize:11,fontWeight:700,color:"#FB7185",marginBottom:4}}>Stuck On</div>
+                  <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                    {studentDetail.stuck_topics.map(t=>(
+                      <span key={t} style={{fontSize:11,fontWeight:600,padding:"3px 8px",borderRadius:6,background:"rgba(244,63,94,0.15)",color:"#FB7185"}}>{t}</span>
+                    ))}
+                  </div>
+                </div>
+              )}
+              <div style={{fontSize:12,fontWeight:700,color:"#E2E8F0",marginBottom:8}}>Progress by Topic</div>
+              <div style={{display:"grid",gap:6,marginBottom:16}}>
+                {studentDetail.progress.map(p=>{const ls=LEVEL[p.level]||LEVEL.Beginner;return(
+                  <div key={p.topic} style={{display:"flex",alignItems:"center",gap:10,background:p.stuck?"rgba(244,63,94,0.06)":"rgba(15,23,42,0.4)",border:`1px solid ${p.stuck?"rgba(244,63,94,0.2)":"rgba(148,163,184,0.05)"}`,borderRadius:8,padding:"8px 12px"}}>
+                    <span style={{fontSize:12,fontWeight:600,color:"#E2E8F0",width:100,flexShrink:0}}>{p.topic}</span>
+                    <div style={{flex:1,height:4,borderRadius:99,background:"rgba(148,163,184,0.08)",overflow:"hidden"}}><div style={{height:"100%",width:`${p.pct}%`,borderRadius:99,background:p.stuck?"#F43F5E":ls.bar}}/></div>
+                    <span style={{fontSize:11,fontWeight:700,color:p.stuck?"#FB7185":ls.color,width:35,textAlign:"right"}}>{p.pct}%</span>
+                    <span style={{fontSize:9,fontWeight:600,padding:"2px 5px",borderRadius:99,color:ls.color,background:ls.bg}}>{ls.label}</span>
+                    {p.stuck&&<span style={{fontSize:9,color:"#F43F5E"}}>⚠️</span>}
+                  </div>
+                );})}
+              </div>
+              {studentDetail.quiz_attempts.length>0&&(<>
+                <div style={{fontSize:12,fontWeight:700,color:"#E2E8F0",marginBottom:8}}>Recent Quizzes</div>
+                <div style={{display:"grid",gap:4,marginBottom:16}}>
+                  {studentDetail.quiz_attempts.slice(0,5).map((q,i)=>(
+                    <div key={i} style={{display:"flex",alignItems:"center",gap:8,background:"rgba(15,23,42,0.4)",borderRadius:7,padding:"7px 12px"}}>
+                      <span style={{fontSize:11,color:"#94A3B8",flex:1}}>{q.topic}</span>
+                      <span style={{fontSize:12,fontWeight:700,color:q.score/q.total>=0.7?"#34D399":q.score/q.total>=0.5?"#FBBF24":"#FB7185"}}>{q.score}/{q.total}</span>
+                      <span style={{fontSize:10,color:"#475569"}}>{new Date(q.date).toLocaleDateString()}</span>
+                    </div>
+                  ))}
+                </div>
+              </>)}
+              <div style={{fontSize:12,fontWeight:700,color:"#E2E8F0",marginBottom:8}}>Quick Actions</div>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+                <button onClick={()=>{setStudentDetail(null);setAssignModal({title:"Custom Exercise",description:"Practice exercise assigned by teacher.",starter_code:"# Write your solution here\n",difficulty:"beginner",topic:studentDetail.stuck_topics[0]||"General"});setAssignStudent(String(studentDetail.student.id));}} style={{padding:"10px",borderRadius:9,border:"1px solid #8B5CF630",background:"#8B5CF610",color:"#8B5CF6",fontSize:12,fontWeight:600,cursor:"pointer",textAlign:"center"}}>Assign Exercise</button>
+                <button onClick={()=>{setStudentDetail(null);setQuizTopic(studentDetail.stuck_topics[0]||"");}} style={{padding:"10px",borderRadius:9,border:"1px solid #3B82F630",background:"#3B82F610",color:"#3B82F6",fontSize:12,fontWeight:600,cursor:"pointer",textAlign:"center"}}>Generate Quiz</button>
+              </div>
+            </div>
+          </>)}
+        </div>
+      </div>}
       <div style={{maxWidth:940,margin:"0 auto",display:"flex",flexDirection:"column",gap:18}}>
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(130px,1fr))",gap:10}}>
           {[{key:"students",label:"Total Students",value:String(students.length||0),accent:"#3B82F6",e:"👥"},{key:"mastery",label:"Avg Mastery",value:students.length?Math.round(students.reduce((a,s)=>a+s.mastery,0)/students.length)+"%":"0%",accent:"#10B981",e:"📊"},{key:"active",label:"Active Now",value:String(students.filter(s=>s.active).length),accent:"#10B981",e:"⚡",pulse:true},{key:"struggling",label:"Struggling",value:String(students.filter(s=>s.status==="Struggling").length+visible.length),accent:"#F43F5E",e:"⚠️"}].map(c=>(
@@ -1090,7 +1178,7 @@ function TeacherDashboard({ user }) {
               <div style={{fontSize:13,fontWeight:700,color:"#F1F5F9",marginBottom:12}}>All Students ({students.length})</div>
               <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(200px,1fr))",gap:8}}>
                 {students.map(s=>(
-                  <div key={s.id} style={{display:"flex",alignItems:"center",gap:8,background:"rgba(15,23,42,0.5)",borderRadius:9,padding:"10px 12px"}}>
+                  <div key={s.id} onClick={()=>openStudentDetail(s.id)} style={{display:"flex",alignItems:"center",gap:8,background:"rgba(15,23,42,0.5)",borderRadius:9,padding:"10px 12px",cursor:"pointer",transition:"border 0.15s",border:"1px solid transparent"}} onMouseEnter={e=>e.currentTarget.style.border="1px solid rgba(148,163,184,0.2)"} onMouseLeave={e=>e.currentTarget.style.border="1px solid transparent"}>
                     <Avatar initials={s.initials} color={s.color} size={28}/>
                     <div style={{flex:1,minWidth:0}}>
                       <div style={{fontSize:12,fontWeight:600,color:"#E2E8F0",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{s.name}</div>
@@ -1122,7 +1210,7 @@ function TeacherDashboard({ user }) {
               <div style={{fontSize:13,fontWeight:700,color:"#F1F5F9",marginBottom:12}}>Active Students (last 30 min)</div>
               <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(200px,1fr))",gap:8}}>
                 {students.filter(s=>s.active).map(s=>(
-                  <div key={s.id} style={{display:"flex",alignItems:"center",gap:8,background:"rgba(15,23,42,0.5)",borderRadius:9,padding:"10px 12px"}}>
+                  <div key={s.id} onClick={()=>openStudentDetail(s.id)} style={{display:"flex",alignItems:"center",gap:8,background:"rgba(15,23,42,0.5)",borderRadius:9,padding:"10px 12px",cursor:"pointer",transition:"border 0.15s",border:"1px solid transparent"}} onMouseEnter={e=>e.currentTarget.style.border="1px solid rgba(148,163,184,0.2)"} onMouseLeave={e=>e.currentTarget.style.border="1px solid transparent"}>
                     <div style={{position:"relative"}}><Avatar initials={s.initials} color={s.color} size={28}/><span style={{position:"absolute",bottom:-1,right:-1,width:8,height:8,borderRadius:"50%",background:"#10B981",border:"2px solid #1E293B"}}/></div>
                     <div style={{flex:1,minWidth:0}}>
                       <div style={{fontSize:12,fontWeight:600,color:"#E2E8F0"}}>{s.name}</div>
@@ -1137,7 +1225,7 @@ function TeacherDashboard({ user }) {
               <div style={{fontSize:13,fontWeight:700,color:"#F1F5F9",marginBottom:12}}>Struggling Students</div>
               <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(200px,1fr))",gap:8}}>
                 {students.filter(s=>s.status==="Struggling"||s.status==="Needs Help").map(s=>(
-                  <div key={s.id} style={{display:"flex",alignItems:"center",gap:8,background:"rgba(15,23,42,0.5)",borderRadius:9,padding:"10px 12px",borderLeft:`3px solid ${s.status==="Struggling"?"#F43F5E":"#F59E0B"}`}}>
+                  <div key={s.id} onClick={()=>openStudentDetail(s.id)} style={{display:"flex",alignItems:"center",gap:8,background:"rgba(15,23,42,0.5)",borderRadius:9,padding:"10px 12px",borderLeft:`3px solid ${s.status==="Struggling"?"#F43F5E":"#F59E0B"}`,cursor:"pointer",transition:"opacity 0.15s"}} onMouseEnter={e=>e.currentTarget.style.opacity="0.85"} onMouseLeave={e=>e.currentTarget.style.opacity="1"}>
                     <Avatar initials={s.initials} color={s.color} size={28}/>
                     <div style={{flex:1,minWidth:0}}>
                       <div style={{fontSize:12,fontWeight:600,color:"#E2E8F0"}}>{s.name}</div>
@@ -1164,7 +1252,7 @@ function TeacherDashboard({ user }) {
             <div key={a.id} style={{borderBottom:i<visible.length-1?"1px solid rgba(148,163,184,0.05)":"none",borderLeft:`3px solid ${atype.color}`,padding:"13px 15px",display:"flex",flexDirection:"column",gap:9}}>
               <div style={{display:"flex",alignItems:"center",gap:9}}>
                 <Avatar initials={a.initials} color={a.color} size={32}/>
-                <div style={{flex:1,minWidth:0}}><div style={{fontSize:13,fontWeight:600,color:"#E2E8F0"}}>{a.name}</div><div style={{fontSize:11,color:"#64748B"}}>{a.time}</div></div>
+                <div onClick={()=>{if(a.user_id)openStudentDetail(a.user_id);}} style={{flex:1,minWidth:0,cursor:a.user_id?"pointer":"default"}}><div style={{fontSize:13,fontWeight:600,color:"#E2E8F0",textDecoration:a.user_id?"underline":"none",textDecorationColor:"rgba(226,232,240,0.3)",textUnderlineOffset:2}}>{a.name}</div><div style={{fontSize:11,color:"#64748B"}}>{a.time}</div></div>
                 <span style={{fontSize:9,fontWeight:700,padding:"2px 7px",borderRadius:99,background:atype.bg,color:atype.color,border:`1px solid ${atype.color}30`}}>{atype.label}</span>
                 <button onClick={()=>resolveAlert(a.id)} title="Resolve" style={{padding:"4px 7px",borderRadius:6,border:"1px solid rgba(148,163,184,0.1)",background:"transparent",color:"#475569",fontSize:11,cursor:"pointer",flexShrink:0}}>✓</button>
               </div>
@@ -1195,7 +1283,7 @@ function TeacherDashboard({ user }) {
                 {["Student","Mastery","Status"].map(h=><th key={h} style={{padding:"9px 15px",textAlign:"left",fontSize:10,fontWeight:700,letterSpacing:"0.08em",textTransform:"uppercase",color:"#475569"}}>{h}</th>)}
               </tr></thead>
               <tbody>{filtered.map((s,i)=>(
-                <tr key={s.id} style={{borderBottom:i<filtered.length-1?"1px solid rgba(148,163,184,0.04)":"none"}}>
+                <tr key={s.id} onClick={()=>openStudentDetail(s.id)} style={{borderBottom:i<filtered.length-1?"1px solid rgba(148,163,184,0.04)":"none",cursor:"pointer",transition:"background 0.15s"}} onMouseEnter={e=>e.currentTarget.style.background="rgba(148,163,184,0.04)"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
                   <td style={{padding:"10px 15px"}}><div style={{display:"flex",alignItems:"center",gap:8}}><Avatar initials={s.initials} color={s.color} size={26}/><div><div style={{fontSize:13,fontWeight:500,color:"#E2E8F0"}}>{s.name}</div><div style={{fontSize:10,color:"#475569"}}>{s.module}</div></div></div></td>
                   <td style={{padding:"10px 15px"}}><div style={{display:"flex",alignItems:"center",gap:6}}><div style={{width:64,height:3,borderRadius:99,background:"rgba(148,163,184,0.08)",overflow:"hidden"}}><div style={{height:"100%",width:`${s.mastery}%`,borderRadius:99,background:s.mastery>=71?"#10B981":s.mastery>=41?"#F59E0B":"#F43F5E"}}/></div><span style={{fontSize:12,fontWeight:600,color:s.mastery>=71?"#34D399":s.mastery>=41?"#FBBF24":"#FB7185"}}>{s.mastery}%</span></div></td>
                   <td style={{padding:"10px 15px"}}><Badge label={s.status} style={STATUS_STYLE[s.status]}/></td>
