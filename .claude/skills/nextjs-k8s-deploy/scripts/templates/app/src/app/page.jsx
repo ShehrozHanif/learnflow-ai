@@ -987,6 +987,7 @@ function TeacherDashboard({ user }) {
   const [quizDiff,setQuizDiff]=useState("beginner");
   const [genQuiz,setGenQuiz]=useState(false);
   const [genQuizResult,setGenQuizResult]=useState(null);
+  const [statsExpanded,setStatsExpanded]=useState(null);
 
   const ALERT_TYPE_LABELS = {
     repeated_error: { label: "Repeated Errors", color: "#F43F5E", bg: "rgba(244,63,94,0.1)" },
@@ -1075,14 +1076,81 @@ function TeacherDashboard({ user }) {
       </div>}
       <div style={{maxWidth:940,margin:"0 auto",display:"flex",flexDirection:"column",gap:18}}>
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(130px,1fr))",gap:10}}>
-          {[{label:"Total Students",value:String(students.length||0),accent:"#3B82F6",e:"👥"},{label:"Avg Mastery",value:students.length?Math.round(students.reduce((a,s)=>a+s.mastery,0)/students.length)+"%":"0%",accent:"#10B981",e:"📊"},{label:"Active Now",value:String(students.filter(s=>s.active).length),accent:"#10B981",e:"⚡",pulse:true},{label:"Struggling",value:String(students.filter(s=>s.status==="Struggling").length+visible.length),accent:"#F43F5E",e:"⚠️"}].map(c=>(
-            <div key={c.label} style={{background:"rgba(30,41,59,0.5)",border:`1px solid ${c.accent}20`,borderRadius:13,padding:"15px 14px",display:"flex",flexDirection:"column",gap:7}}>
+          {[{key:"students",label:"Total Students",value:String(students.length||0),accent:"#3B82F6",e:"👥"},{key:"mastery",label:"Avg Mastery",value:students.length?Math.round(students.reduce((a,s)=>a+s.mastery,0)/students.length)+"%":"0%",accent:"#10B981",e:"📊"},{key:"active",label:"Active Now",value:String(students.filter(s=>s.active).length),accent:"#10B981",e:"⚡",pulse:true},{key:"struggling",label:"Struggling",value:String(students.filter(s=>s.status==="Struggling").length+visible.length),accent:"#F43F5E",e:"⚠️"}].map(c=>(
+            <div key={c.label} onClick={()=>setStatsExpanded(statsExpanded===c.key?null:c.key)} style={{background:statsExpanded===c.key?"rgba(30,41,59,0.7)":"rgba(30,41,59,0.5)",border:`1px solid ${statsExpanded===c.key?c.accent:c.accent+"20"}`,borderRadius:13,padding:"15px 14px",display:"flex",flexDirection:"column",gap:7,cursor:"pointer",transition:"all 0.2s ease"}}>
               <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}><span style={{fontSize:17}}>{c.e}</span>{c.pulse&&<span style={{width:7,height:7,borderRadius:"50%",background:"#10B981",animation:"pulse2 2s ease-in-out infinite",display:"inline-block"}}/>}</div>
               <div style={{fontSize:22,fontWeight:800,color:"#F1F5F9",letterSpacing:"-0.02em",lineHeight:1}}>{c.value}</div>
-              <div style={{fontSize:11,color:"#64748B"}}>{c.label}</div>
+              <div style={{fontSize:11,color:"#64748B"}}>{c.label} <span style={{fontSize:9,color:"#475569"}}>▼</span></div>
             </div>
           ))}
         </div>
+        {statsExpanded&&(
+          <div style={{background:"rgba(30,41,59,0.4)",border:"1px solid rgba(148,163,184,0.1)",borderRadius:14,padding:"16px",animation:"fadeIn 0.2s ease"}}>
+            {statsExpanded==="students"&&(<>
+              <div style={{fontSize:13,fontWeight:700,color:"#F1F5F9",marginBottom:12}}>All Students ({students.length})</div>
+              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(200px,1fr))",gap:8}}>
+                {students.map(s=>(
+                  <div key={s.id} style={{display:"flex",alignItems:"center",gap:8,background:"rgba(15,23,42,0.5)",borderRadius:9,padding:"10px 12px"}}>
+                    <Avatar initials={s.initials} color={s.color} size={28}/>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontSize:12,fontWeight:600,color:"#E2E8F0",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{s.name}</div>
+                      <div style={{fontSize:10,color:"#475569"}}>{s.module}</div>
+                    </div>
+                    <div style={{fontSize:12,fontWeight:700,color:s.mastery>=71?"#34D399":s.mastery>=41?"#FBBF24":"#FB7185"}}>{s.mastery}%</div>
+                  </div>
+                ))}
+                {students.length===0&&<div style={{fontSize:12,color:"#64748B",padding:8}}>No students enrolled yet</div>}
+              </div>
+            </>)}
+            {statsExpanded==="mastery"&&(<>
+              <div style={{fontSize:13,fontWeight:700,color:"#F1F5F9",marginBottom:12}}>Mastery Distribution</div>
+              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(140px,1fr))",gap:8}}>
+                {[
+                  {label:"Mastered (91-100%)",count:students.filter(s=>s.mastery>=91).length,color:"#60A5FA",bg:"rgba(96,165,250,0.1)"},
+                  {label:"Proficient (71-90%)",count:students.filter(s=>s.mastery>=71&&s.mastery<91).length,color:"#34D399",bg:"rgba(52,211,153,0.1)"},
+                  {label:"Learning (41-70%)",count:students.filter(s=>s.mastery>=41&&s.mastery<71).length,color:"#FBBF24",bg:"rgba(251,191,36,0.1)"},
+                  {label:"Beginner (0-40%)",count:students.filter(s=>s.mastery<41).length,color:"#FB7185",bg:"rgba(251,113,133,0.1)"},
+                ].map(l=>(
+                  <div key={l.label} style={{background:l.bg,borderRadius:9,padding:"12px",textAlign:"center",border:`1px solid ${l.color}20`}}>
+                    <div style={{fontSize:24,fontWeight:800,color:l.color}}>{l.count}</div>
+                    <div style={{fontSize:10,color:l.color,marginTop:2}}>{l.label}</div>
+                  </div>
+                ))}
+              </div>
+            </>)}
+            {statsExpanded==="active"&&(<>
+              <div style={{fontSize:13,fontWeight:700,color:"#F1F5F9",marginBottom:12}}>Active Students (last 30 min)</div>
+              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(200px,1fr))",gap:8}}>
+                {students.filter(s=>s.active).map(s=>(
+                  <div key={s.id} style={{display:"flex",alignItems:"center",gap:8,background:"rgba(15,23,42,0.5)",borderRadius:9,padding:"10px 12px"}}>
+                    <div style={{position:"relative"}}><Avatar initials={s.initials} color={s.color} size={28}/><span style={{position:"absolute",bottom:-1,right:-1,width:8,height:8,borderRadius:"50%",background:"#10B981",border:"2px solid #1E293B"}}/></div>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontSize:12,fontWeight:600,color:"#E2E8F0"}}>{s.name}</div>
+                      <div style={{fontSize:10,color:"#475569"}}>{s.module} — {s.mastery}%</div>
+                    </div>
+                  </div>
+                ))}
+                {students.filter(s=>s.active).length===0&&<div style={{fontSize:12,color:"#64748B",padding:8}}>No students active right now</div>}
+              </div>
+            </>)}
+            {statsExpanded==="struggling"&&(<>
+              <div style={{fontSize:13,fontWeight:700,color:"#F1F5F9",marginBottom:12}}>Struggling Students</div>
+              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(200px,1fr))",gap:8}}>
+                {students.filter(s=>s.status==="Struggling"||s.status==="Needs Help").map(s=>(
+                  <div key={s.id} style={{display:"flex",alignItems:"center",gap:8,background:"rgba(15,23,42,0.5)",borderRadius:9,padding:"10px 12px",borderLeft:`3px solid ${s.status==="Struggling"?"#F43F5E":"#F59E0B"}`}}>
+                    <Avatar initials={s.initials} color={s.color} size={28}/>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontSize:12,fontWeight:600,color:"#E2E8F0"}}>{s.name}</div>
+                      <div style={{fontSize:10,color:"#475569"}}>{s.module}</div>
+                    </div>
+                    <Badge label={s.status} style={STATUS_STYLE[s.status]}/>
+                  </div>
+                ))}
+                {students.filter(s=>s.status==="Struggling"||s.status==="Needs Help").length===0&&<div style={{fontSize:12,color:"#64748B",padding:8}}>No struggling students right now!</div>}
+              </div>
+            </>)}
+          </div>
+        )}
         <div style={{background:"rgba(30,41,59,0.4)",border:"1px solid rgba(148,163,184,0.07)",borderRadius:14,overflow:"hidden"}}>
           <div style={{display:"flex",alignItems:"center",gap:9,padding:"13px 15px",borderBottom:"1px solid rgba(148,163,184,0.06)"}}>
             <span style={{fontSize:15}}>⚠️</span><span style={{fontSize:13,fontWeight:600,color:"#F1F5F9"}}>Struggle Alerts</span>
