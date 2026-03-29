@@ -640,24 +640,24 @@ const NAV_ITEMS = [
   { id:"progress",     label:"Progress",     emoji:"📈" },
   { id:"settings",     label:"Settings",     emoji:"⚙️" },
 ];
-function Sidebar({ expanded, setExpanded, activePage, setActivePage, role, onLogout, isMobile, onClose }) {
+function Sidebar({ expanded, setExpanded, activePage, setActivePage, role, onLogout, isMobile, onClose, theme }) {
   const accent = role==="teacher"?"#10B981":"#3B82F6";
   const grad   = role==="teacher"?"linear-gradient(135deg,#10B981,#059669)":"linear-gradient(135deg,#3B82F6,#6366F1)";
   return (
     <>
       {isMobile && expanded && <div onClick={onClose} style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.6)", zIndex:25, backdropFilter:"blur(2px)" }}/>}
-      <div style={{ position:isMobile?"fixed":"relative", top:0, left:isMobile?(expanded?0:-240):"auto", height:isMobile?"100vh":"100%", width:isMobile?220:(expanded?210:56), background:"rgba(13,20,36,0.99)", borderRight:"1px solid rgba(148,163,184,0.08)", display:"flex", flexDirection:"column", transition:isMobile?"left 0.25s cubic-bezier(.4,0,.2,1)":"width 0.25s cubic-bezier(.4,0,.2,1)", overflow:"hidden", flexShrink:0, zIndex:30 }}>
-        <div style={{ height:50, display:"flex", alignItems:"center", padding:"0 13px", borderBottom:"1px solid rgba(148,163,184,0.07)", gap:8, flexShrink:0 }}>
+      <div style={{ position:isMobile?"fixed":"relative", top:0, left:isMobile?(expanded?0:-240):"auto", height:isMobile?"100vh":"100%", width:isMobile?220:(expanded?210:56), background:"var(--lf-sidebar)", borderRight:"1px solid var(--lf-border)", display:"flex", flexDirection:"column", transition:isMobile?"left 0.25s cubic-bezier(.4,0,.2,1)":"width 0.25s cubic-bezier(.4,0,.2,1), background 0.3s", overflow:"hidden", flexShrink:0, zIndex:30 }}>
+        <div style={{ height:50, display:"flex", alignItems:"center", padding:"0 13px", borderBottom:"1px solid var(--lf-border)", gap:8, flexShrink:0 }}>
           <div style={{ width:26, height:26, borderRadius:7, background:grad, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
             <svg viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" style={{width:12,height:12}}><path strokeLinecap="round" strokeLinejoin="round" d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
           </div>
-          {(expanded||isMobile) && <span style={{ fontSize:14, fontWeight:700, color:"#F1F5F9", whiteSpace:"nowrap" }}>LearnFlow</span>}
+          {(expanded||isMobile) && <span style={{ fontSize:14, fontWeight:700, color:"var(--lf-text)", whiteSpace:"nowrap" }}>LearnFlow</span>}
         </div>
         {(expanded||isMobile) && (
-          <div style={{ margin:"10px 8px 4px", padding:"9px 11px", background:"rgba(30,41,59,0.5)", border:"1px solid rgba(148,163,184,0.07)", borderRadius:10, display:"flex", alignItems:"center", gap:8 }}>
+          <div style={{ margin:"10px 8px 4px", padding:"9px 11px", background:"var(--lf-surface2)", border:"1px solid var(--lf-border)", borderRadius:10, display:"flex", alignItems:"center", gap:8 }}>
             <div style={{ width:26, height:26, borderRadius:"50%", background:grad, display:"flex", alignItems:"center", justifyContent:"center", fontSize:10, fontWeight:700, color:"white", flexShrink:0 }}>{role==="teacher"?"R":"M"}</div>
             <div style={{ minWidth:0 }}>
-              <div style={{ fontSize:12, fontWeight:600, color:"#E2E8F0", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{role==="teacher"?"Mr. Rodriguez":"Maya Chen"}</div>
+              <div style={{ fontSize:12, fontWeight:600, color:"var(--lf-text2)", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{role==="teacher"?"Mr. Rodriguez":"Maya Chen"}</div>
               <div style={{ fontSize:10, color:accent, fontWeight:500, textTransform:"capitalize" }}>{role}</div>
             </div>
           </div>
@@ -2522,8 +2522,8 @@ function LeaderboardPage({ user }) {
 // ══════════════════════════════════════════════════════════════════════════════
 // SETTINGS PAGE (Sidebar)
 // ══════════════════════════════════════════════════════════════════════════════
-function SettingsPage({ user, role }) {
-  const [darkMode, setDarkMode] = useState(true);
+function SettingsPage({ user, role, theme, setTheme }) {
+  const darkMode = theme === "dark";
   const [fontSize, setFontSize] = useState(14);
   const [toast, setToast] = useState(null);
   const [profile, setProfile] = useState({ education:"", experience:"", specialization:"", achievements:"", bio:"" });
@@ -2553,55 +2553,56 @@ function SettingsPage({ user, role }) {
     setProfileSaving(false);
   };
 
-  const inputStyle = {width:"100%",background:"rgba(15,23,42,0.5)",border:"1px solid rgba(148,163,184,0.12)",borderRadius:8,padding:"10px 12px",fontSize:12,color:"#E2E8F0",outline:"none",fontFamily:"inherit",resize:"vertical"};
+  const inputStyle = {width:"100%",background:"var(--lf-input-bg)",border:"1px solid var(--lf-border)",borderRadius:8,padding:"10px 12px",fontSize:12,color:"var(--lf-text2)",outline:"none",fontFamily:"inherit",resize:"vertical"};
+  const cardStyle = {background:"var(--lf-card)",border:"1px solid var(--lf-card-border)",borderRadius:14,padding:"20px",marginBottom:14,boxShadow:"var(--lf-shadow)",transition:"background 0.3s, border-color 0.3s"};
 
   return (
     <div style={{flex:1,overflowY:"auto",padding:"20px 14px"}}>
       {toast&&<Toast message={toast.message} type={toast.type} onClose={()=>setToast(null)}/>}
       <div style={{maxWidth:500,margin:"0 auto"}}>
-        <div style={{fontSize:18,fontWeight:800,color:"#F1F5F9",marginBottom:20}}>Settings</div>
-        <div style={{background:"rgba(30,41,59,0.4)",border:"1px solid rgba(148,163,184,0.07)",borderRadius:14,padding:"20px",marginBottom:14}}>
-          <div style={{fontSize:13,fontWeight:700,color:"#E2E8F0",marginBottom:14}}>Profile</div>
+        <div style={{fontSize:18,fontWeight:800,color:"var(--lf-text)",marginBottom:20}}>Settings</div>
+        <div style={cardStyle}>
+          <div style={{fontSize:13,fontWeight:700,color:"var(--lf-text2)",marginBottom:14}}>Profile</div>
           <div style={{display:"grid",gap:10}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-              <span style={{fontSize:12,color:"#94A3B8"}}>Name</span>
-              <span style={{fontSize:12,fontWeight:600,color:"#E2E8F0"}}>{user?.name || "User"}</span>
+              <span style={{fontSize:12,color:"var(--lf-text-muted)"}}>Name</span>
+              <span style={{fontSize:12,fontWeight:600,color:"var(--lf-text2)"}}>{user?.name || "User"}</span>
             </div>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-              <span style={{fontSize:12,color:"#94A3B8"}}>Email</span>
-              <span style={{fontSize:12,fontWeight:600,color:"#E2E8F0"}}>{user?.email || "—"}</span>
+              <span style={{fontSize:12,color:"var(--lf-text-muted)"}}>Email</span>
+              <span style={{fontSize:12,fontWeight:600,color:"var(--lf-text2)"}}>{user?.email || "—"}</span>
             </div>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-              <span style={{fontSize:12,color:"#94A3B8"}}>Role</span>
-              <span style={{fontSize:12,fontWeight:600,color:"#E2E8F0",textTransform:"capitalize"}}>{role}</span>
+              <span style={{fontSize:12,color:"var(--lf-text-muted)"}}>Role</span>
+              <span style={{fontSize:12,fontWeight:600,color:"var(--lf-text2)",textTransform:"capitalize"}}>{role}</span>
             </div>
           </div>
         </div>
 
         {role==="teacher"&&(
-          <div style={{background:"rgba(30,41,59,0.4)",border:"1px solid rgba(148,163,184,0.07)",borderRadius:14,padding:"20px",marginBottom:14}}>
-            <div style={{fontSize:13,fontWeight:700,color:"#E2E8F0",marginBottom:4}}>Teacher Profile</div>
-            <div style={{fontSize:11,color:"#64748B",marginBottom:16}}>This information is visible to students browsing the Faculty page</div>
+          <div style={cardStyle}>
+            <div style={{fontSize:13,fontWeight:700,color:"var(--lf-text2)",marginBottom:4}}>Teacher Profile</div>
+            <div style={{fontSize:11,color:"var(--lf-text-muted)",marginBottom:16}}>This information is visible to students browsing the Faculty page</div>
             {profileLoading ? <LoadingSpinner/> : (
               <div style={{display:"grid",gap:14}}>
                 <div>
-                  <label style={{fontSize:11,fontWeight:600,color:"#94A3B8",marginBottom:4,display:"block"}}>Education</label>
+                  <label style={{fontSize:11,fontWeight:600,color:"var(--lf-text-muted)",marginBottom:4,display:"block"}}>Education</label>
                   <input value={profile.education} onChange={e=>setProfile(p=>({...p,education:e.target.value}))} placeholder="e.g. PhD Computer Science, Stanford University" style={inputStyle}/>
                 </div>
                 <div>
-                  <label style={{fontSize:11,fontWeight:600,color:"#94A3B8",marginBottom:4,display:"block"}}>Experience</label>
+                  <label style={{fontSize:11,fontWeight:600,color:"var(--lf-text-muted)",marginBottom:4,display:"block"}}>Experience</label>
                   <input value={profile.experience} onChange={e=>setProfile(p=>({...p,experience:e.target.value}))} placeholder="e.g. 10 years teaching Python & ML" style={inputStyle}/>
                 </div>
                 <div>
-                  <label style={{fontSize:11,fontWeight:600,color:"#94A3B8",marginBottom:4,display:"block"}}>Specialization</label>
+                  <label style={{fontSize:11,fontWeight:600,color:"var(--lf-text-muted)",marginBottom:4,display:"block"}}>Specialization</label>
                   <input value={profile.specialization} onChange={e=>setProfile(p=>({...p,specialization:e.target.value}))} placeholder="e.g. Machine Learning, Data Science, Web Development" style={inputStyle}/>
                 </div>
                 <div>
-                  <label style={{fontSize:11,fontWeight:600,color:"#94A3B8",marginBottom:4,display:"block"}}>Achievements</label>
+                  <label style={{fontSize:11,fontWeight:600,color:"var(--lf-text-muted)",marginBottom:4,display:"block"}}>Achievements</label>
                   <textarea value={profile.achievements} onChange={e=>setProfile(p=>({...p,achievements:e.target.value}))} placeholder="e.g. Published 20+ papers, Google AI Mentor Award" rows={2} style={inputStyle}/>
                 </div>
                 <div>
-                  <label style={{fontSize:11,fontWeight:600,color:"#94A3B8",marginBottom:4,display:"block"}}>Bio</label>
+                  <label style={{fontSize:11,fontWeight:600,color:"var(--lf-text-muted)",marginBottom:4,display:"block"}}>Bio</label>
                   <textarea value={profile.bio} onChange={e=>setProfile(p=>({...p,bio:e.target.value}))} placeholder="Tell students about yourself and your teaching style..." rows={3} style={inputStyle}/>
                 </div>
                 <button onClick={saveProfile} disabled={profileSaving}
@@ -2612,32 +2613,32 @@ function SettingsPage({ user, role }) {
             )}
           </div>
         )}
-        <div style={{background:"rgba(30,41,59,0.4)",border:"1px solid rgba(148,163,184,0.07)",borderRadius:14,padding:"20px",marginBottom:14}}>
-          <div style={{fontSize:13,fontWeight:700,color:"#E2E8F0",marginBottom:14}}>Appearance</div>
+        <div style={cardStyle}>
+          <div style={{fontSize:13,fontWeight:700,color:"var(--lf-text2)",marginBottom:14}}>Appearance</div>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
-            <span style={{fontSize:12,color:"#94A3B8"}}>Dark Mode</span>
-            <div onClick={()=>{setDarkMode(!darkMode);setToast({message:darkMode?"Light mode coming soon!":"Dark mode active",type:"info"});}} style={{width:40,height:22,borderRadius:99,background:darkMode?"#3B82F6":"rgba(148,163,184,0.2)",cursor:"pointer",padding:2,transition:"background 0.2s"}}>
+            <span style={{fontSize:12,color:"var(--lf-text-muted)"}}>Dark Mode</span>
+            <div onClick={()=>{setTheme(darkMode?"light":"dark");setToast({message:darkMode?"Light mode activated":"Dark mode activated",type:"info"});}} style={{width:40,height:22,borderRadius:99,background:darkMode?"#3B82F6":"rgba(148,163,184,0.3)",cursor:"pointer",padding:2,transition:"background 0.2s"}}>
               <div style={{width:18,height:18,borderRadius:"50%",background:"white",transform:darkMode?"translateX(18px)":"translateX(0)",transition:"transform 0.2s"}}/>
             </div>
           </div>
         </div>
-        <div style={{background:"rgba(30,41,59,0.4)",border:"1px solid rgba(148,163,184,0.07)",borderRadius:14,padding:"20px",marginBottom:14}}>
-          <div style={{fontSize:13,fontWeight:700,color:"#E2E8F0",marginBottom:14}}>Code Editor</div>
+        <div style={cardStyle}>
+          <div style={{fontSize:13,fontWeight:700,color:"var(--lf-text2)",marginBottom:14}}>Code Editor</div>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-            <span style={{fontSize:12,color:"#94A3B8"}}>Font Size</span>
+            <span style={{fontSize:12,color:"var(--lf-text-muted)"}}>Font Size</span>
             <div style={{display:"flex",alignItems:"center",gap:8}}>
-              <button onClick={()=>setFontSize(Math.max(10,fontSize-1))} style={{width:26,height:26,borderRadius:6,border:"1px solid rgba(148,163,184,0.15)",background:"transparent",color:"#94A3B8",cursor:"pointer",fontSize:14}}>−</button>
-              <span style={{fontSize:13,fontWeight:700,color:"#E2E8F0",width:24,textAlign:"center"}}>{fontSize}</span>
-              <button onClick={()=>setFontSize(Math.min(24,fontSize+1))} style={{width:26,height:26,borderRadius:6,border:"1px solid rgba(148,163,184,0.15)",background:"transparent",color:"#94A3B8",cursor:"pointer",fontSize:14}}>+</button>
+              <button onClick={()=>setFontSize(Math.max(10,fontSize-1))} style={{width:26,height:26,borderRadius:6,border:"1px solid var(--lf-border)",background:"transparent",color:"var(--lf-text-muted)",cursor:"pointer",fontSize:14}}>−</button>
+              <span style={{fontSize:13,fontWeight:700,color:"var(--lf-text2)",width:24,textAlign:"center"}}>{fontSize}</span>
+              <button onClick={()=>setFontSize(Math.min(24,fontSize+1))} style={{width:26,height:26,borderRadius:6,border:"1px solid var(--lf-border)",background:"transparent",color:"var(--lf-text-muted)",cursor:"pointer",fontSize:14}}>+</button>
             </div>
           </div>
         </div>
-        <div style={{background:"rgba(30,41,59,0.4)",border:"1px solid rgba(148,163,184,0.07)",borderRadius:14,padding:"20px"}}>
-          <div style={{fontSize:13,fontWeight:700,color:"#E2E8F0",marginBottom:14}}>About</div>
+        <div style={{...cardStyle,marginBottom:0}}>
+          <div style={{fontSize:13,fontWeight:700,color:"var(--lf-text2)",marginBottom:14}}>About</div>
           <div style={{display:"grid",gap:8}}>
-            <div style={{display:"flex",justifyContent:"space-between"}}><span style={{fontSize:12,color:"#94A3B8"}}>App</span><span style={{fontSize:12,color:"#E2E8F0"}}>LearnFlow v1.0</span></div>
-            <div style={{display:"flex",justifyContent:"space-between"}}><span style={{fontSize:12,color:"#94A3B8"}}>AI Model</span><span style={{fontSize:12,color:"#E2E8F0"}}>GPT-4o-mini</span></div>
-            <div style={{display:"flex",justifyContent:"space-between"}}><span style={{fontSize:12,color:"#94A3B8"}}>Stack</span><span style={{fontSize:12,color:"#E2E8F0"}}>Next.js + K8s + Kafka</span></div>
+            <div style={{display:"flex",justifyContent:"space-between"}}><span style={{fontSize:12,color:"var(--lf-text-muted)"}}>App</span><span style={{fontSize:12,color:"var(--lf-text2)"}}>LearnFlow v1.0</span></div>
+            <div style={{display:"flex",justifyContent:"space-between"}}><span style={{fontSize:12,color:"var(--lf-text-muted)"}}>AI Model</span><span style={{fontSize:12,color:"var(--lf-text2)"}}>GPT-4o-mini</span></div>
+            <div style={{display:"flex",justifyContent:"space-between"}}><span style={{fontSize:12,color:"var(--lf-text-muted)"}}>Stack</span><span style={{fontSize:12,color:"var(--lf-text2)"}}>Next.js + K8s + Kafka</span></div>
           </div>
         </div>
       </div>
@@ -2648,7 +2649,7 @@ function SettingsPage({ user, role }) {
 // ══════════════════════════════════════════════════════════════════════════════
 // APP SHELL
 // ══════════════════════════════════════════════════════════════════════════════
-function AppShell({ role, user, onLogout }) {
+function AppShell({ role, user, onLogout, theme, setTheme }) {
   const [sidebarOpen, setSidebarOpen]       = useState(false);
   const [sidebarExpanded, setSidebarExpanded] = useState(true);
   const [activePage, setActivePage]         = useState("dashboard");
@@ -2663,21 +2664,21 @@ function AppShell({ role, user, onLogout }) {
   },[]);
 
   return (
-    <div style={{display:"flex",height:"100vh",background:"#0F172A",overflow:"hidden"}}>
-      {!isMobile&&<Sidebar expanded={sidebarExpanded} setExpanded={setSidebarExpanded} activePage={activePage} setActivePage={setActivePage} role={role} onLogout={onLogout} isMobile={false} onClose={()=>{}}/>}
-      {isMobile&&<Sidebar expanded={sidebarOpen} setExpanded={setSidebarOpen} activePage={activePage} setActivePage={setActivePage} role={role} onLogout={onLogout} isMobile={true} onClose={()=>setSidebarOpen(false)}/>}
+    <div style={{display:"flex",height:"100vh",background:"var(--lf-bg,#0F172A)",overflow:"hidden",transition:"background 0.3s"}}>
+      {!isMobile&&<Sidebar expanded={sidebarExpanded} setExpanded={setSidebarExpanded} activePage={activePage} setActivePage={setActivePage} role={role} onLogout={onLogout} isMobile={false} onClose={()=>{}} theme={theme}/>}
+      {isMobile&&<Sidebar expanded={sidebarOpen} setExpanded={setSidebarOpen} activePage={activePage} setActivePage={setActivePage} role={role} onLogout={onLogout} isMobile={true} onClose={()=>setSidebarOpen(false)} theme={theme}/>}
       <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",minWidth:0}}>
-        <div style={{height:50,display:"flex",alignItems:"center",justifyContent:"space-between",padding:"0 14px",background:"rgba(15,23,42,0.97)",borderBottom:"1px solid rgba(148,163,184,0.08)",flexShrink:0,gap:8}}>
+        <div style={{height:50,display:"flex",alignItems:"center",justifyContent:"space-between",padding:"0 14px",background:"var(--lf-header)",borderBottom:"1px solid var(--lf-border)",flexShrink:0,gap:8,transition:"background 0.3s"}}>
           <div style={{display:"flex",alignItems:"center",gap:9}}>
-            {isMobile&&<button onClick={()=>setSidebarOpen(v=>!v)} style={{background:"rgba(30,41,59,0.7)",border:"1px solid rgba(148,163,184,0.1)",borderRadius:7,padding:"5px 7px",color:"#94A3B8",cursor:"pointer",display:"flex",alignItems:"center",flexShrink:0}}>
+            {isMobile&&<button onClick={()=>setSidebarOpen(v=>!v)} style={{background:"var(--lf-surface)",border:"1px solid var(--lf-border)",borderRadius:7,padding:"5px 7px",color:"var(--lf-text-muted)",cursor:"pointer",display:"flex",alignItems:"center",flexShrink:0}}>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{width:16,height:16}}><path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5"/></svg>
             </button>}
-            <span style={{fontSize:13,fontWeight:500,color:"#94A3B8",textTransform:"capitalize"}}>{activePage}</span>
+            <span style={{fontSize:13,fontWeight:500,color:"var(--lf-text-muted)",textTransform:"capitalize"}}>{activePage}</span>
           </div>
           <div style={{display:"flex",alignItems:"center",gap:8,flexShrink:0}}>
-            <div style={{display:"flex",alignItems:"center",gap:6,padding:"3px 8px 3px 3px",background:"rgba(30,41,59,0.7)",border:"1px solid rgba(148,163,184,0.08)",borderRadius:99}}>
+            <div style={{display:"flex",alignItems:"center",gap:6,padding:"3px 8px 3px 3px",background:"var(--lf-surface)",border:"1px solid var(--lf-border)",borderRadius:99}}>
               <div style={{width:24,height:24,borderRadius:"50%",background:grad,display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,fontWeight:700,color:"white"}}>{user?.name?user.name.split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase():role==="teacher"?"R":"M"}</div>
-              <span style={{fontSize:12,fontWeight:500,color:"#CBD5E1",maxWidth:80,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{user?.name||"User"}</span>
+              <span style={{fontSize:12,fontWeight:500,color:"var(--lf-text3)",maxWidth:80,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{user?.name||"User"}</span>
             </div>
             <button onClick={onLogout} style={{background:"rgba(244,63,94,0.08)",border:"1px solid rgba(244,63,94,0.15)",borderRadius:8,padding:"6px 10px",color:"#FB7185",cursor:"pointer",fontSize:12,fontWeight:500,display:"flex",alignItems:"center",gap:5}}>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" style={{width:13,height:13}}><path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9"/></svg>
@@ -2692,7 +2693,7 @@ function AppShell({ role, user, onLogout }) {
           {activePage==="teachers"&&role==="student"&&<TeachersPage user={user}/>}
           {activePage==="leaderboard"&&<LeaderboardPage user={user}/>}
           {activePage==="progress"&&<ProgressPage user={user} role={role}/>}
-          {activePage==="settings"&&<SettingsPage user={user} role={role}/>}
+          {activePage==="settings"&&<SettingsPage user={user} role={role} theme={theme} setTheme={setTheme}/>}
         </div>
       </div>
     </div>
@@ -2707,6 +2708,53 @@ export default function App() {
   const [role, setRole]     = useState(null);
   const [user, setUser]     = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
+  const [theme, setTheme]   = useLocalStorage("lf_theme", "dark");
+
+  // Apply theme CSS variables to document
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    const root = document.documentElement;
+    if (theme === "light") {
+      root.style.setProperty("--lf-bg",          "#F1F5F9");
+      root.style.setProperty("--lf-bg2",         "#FFFFFF");
+      root.style.setProperty("--lf-bg3",         "#E2E8F0");
+      root.style.setProperty("--lf-surface",     "rgba(255,255,255,0.85)");
+      root.style.setProperty("--lf-surface2",    "rgba(241,245,249,0.9)");
+      root.style.setProperty("--lf-border",      "rgba(148,163,184,0.2)");
+      root.style.setProperty("--lf-text",        "#0F172A");
+      root.style.setProperty("--lf-text2",       "#334155");
+      root.style.setProperty("--lf-text3",       "#64748B");
+      root.style.setProperty("--lf-text-muted",  "#94A3B8");
+      root.style.setProperty("--lf-sidebar",     "rgba(255,255,255,0.97)");
+      root.style.setProperty("--lf-header",      "rgba(255,255,255,0.97)");
+      root.style.setProperty("--lf-card",        "rgba(255,255,255,0.7)");
+      root.style.setProperty("--lf-card-border", "rgba(148,163,184,0.15)");
+      root.style.setProperty("--lf-code-bg",     "#F8FAFC");
+      root.style.setProperty("--lf-code-text",   "#1E293B");
+      root.style.setProperty("--lf-input-bg",    "rgba(241,245,249,0.8)");
+      root.style.setProperty("--lf-shadow",      "0 1px 3px rgba(0,0,0,0.08)");
+    } else {
+      root.style.setProperty("--lf-bg",          "#0F172A");
+      root.style.setProperty("--lf-bg2",         "#1E293B");
+      root.style.setProperty("--lf-bg3",         "#0D1117");
+      root.style.setProperty("--lf-surface",     "rgba(30,41,59,0.4)");
+      root.style.setProperty("--lf-surface2",    "rgba(30,41,59,0.5)");
+      root.style.setProperty("--lf-border",      "rgba(148,163,184,0.07)");
+      root.style.setProperty("--lf-text",        "#F1F5F9");
+      root.style.setProperty("--lf-text2",       "#E2E8F0");
+      root.style.setProperty("--lf-text3",       "#CBD5E1");
+      root.style.setProperty("--lf-text-muted",  "#64748B");
+      root.style.setProperty("--lf-sidebar",     "rgba(13,20,36,0.99)");
+      root.style.setProperty("--lf-header",      "rgba(15,23,42,0.97)");
+      root.style.setProperty("--lf-card",        "rgba(30,41,59,0.4)");
+      root.style.setProperty("--lf-card-border", "rgba(148,163,184,0.07)");
+      root.style.setProperty("--lf-code-bg",     "rgba(15,23,42,0.7)");
+      root.style.setProperty("--lf-code-text",   "#ABB2BF");
+      root.style.setProperty("--lf-input-bg",    "rgba(15,23,42,0.5)");
+      root.style.setProperty("--lf-shadow",      "none");
+    }
+    document.body.style.background = theme === "light" ? "#F1F5F9" : "#0F172A";
+  }, [theme]);
 
   // Check for existing token on mount
   useEffect(() => {
@@ -2750,7 +2798,7 @@ export default function App() {
 
   if (authLoading) {
     return (
-      <div style={{ minHeight:"100vh", background:"#0F172A", display:"flex", alignItems:"center", justifyContent:"center" }}>
+      <div style={{ minHeight:"100vh", background:"var(--lf-bg,#0F172A)", display:"flex", alignItems:"center", justifyContent:"center" }}>
         <div style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:12 }}>
           <div style={{ width:36, height:36, border:"3px solid rgba(59,130,246,0.2)", borderTopColor:"#3B82F6", borderRadius:"50%", animation:"spin 0.7s linear infinite" }}/>
           <span style={{ color:"#64748B", fontSize:13 }}>Loading...</span>
@@ -2764,7 +2812,7 @@ export default function App() {
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
         *, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
-        html, body { background:#0F172A; font-family:'Inter',system-ui,sans-serif; height:100%; }
+        html, body { background:var(--lf-bg,#0F172A); font-family:'Inter',system-ui,sans-serif; height:100%; transition:background 0.3s; }
         ::-webkit-scrollbar { width:4px; height:4px; }
         ::-webkit-scrollbar-track { background:transparent; }
         ::-webkit-scrollbar-thumb { background:rgba(148,163,184,0.15); border-radius:99px; }
@@ -2807,6 +2855,8 @@ export default function App() {
           role={role}
           user={user}
           onLogout={handleLogout}
+          theme={theme}
+          setTheme={setTheme}
         />
       )}
     </>
