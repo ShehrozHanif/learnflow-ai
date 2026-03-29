@@ -263,9 +263,9 @@ function LandingPage({ onNavigate }) {
 
         {/* desktop nav */}
         <div style={{ display:"flex", alignItems:"center", gap:24, fontSize:13, color:"#94A3B8" }} className="lf-hide-mobile">
-          {["Features","Curriculum","For Teachers","Pricing"].map(item=>(
-            <a key={item} href="#" style={{ color:"#94A3B8", textDecoration:"none", transition:"color 0.15s" }}
-              onMouseEnter={e=>e.target.style.color="#E2E8F0"} onMouseLeave={e=>e.target.style.color="#94A3B8"}>{item}</a>
+          {[{label:"Features",id:"features"},{label:"Curriculum",id:"curriculum"},{label:"For Teachers",id:"for-teachers"},{label:"Pricing",id:"pricing"}].map(item=>(
+            <a key={item.id} href={`#${item.id}`} style={{ color:"#94A3B8", textDecoration:"none", transition:"color 0.15s" }}
+              onMouseEnter={e=>e.target.style.color="#E2E8F0"} onMouseLeave={e=>e.target.style.color="#94A3B8"}>{item.label}</a>
           ))}
         </div>
 
@@ -285,8 +285,8 @@ function LandingPage({ onNavigate }) {
       {/* mobile menu */}
       {mobileMenu && (
         <div style={{ position:"relative", zIndex:20, background:"rgba(15,23,42,0.99)", borderBottom:"1px solid rgba(148,163,184,0.08)", padding:"10px 16px 14px" }}>
-          {["Features","Curriculum","For Teachers","Pricing"].map(item=>(
-            <div key={item} style={{ padding:"10px 4px", fontSize:14, color:"#94A3B8", borderBottom:"1px solid rgba(148,163,184,0.05)" }}>{item}</div>
+          {[{label:"Features",id:"features"},{label:"Curriculum",id:"curriculum"},{label:"For Teachers",id:"for-teachers"},{label:"Pricing",id:"pricing"}].map(item=>(
+            <a key={item.id} href={`#${item.id}`} onClick={()=>setMobileMenu(false)} style={{ display:"block", padding:"10px 4px", fontSize:14, color:"#94A3B8", borderBottom:"1px solid rgba(148,163,184,0.05)", textDecoration:"none" }}>{item.label}</a>
           ))}
         </div>
       )}
@@ -357,7 +357,7 @@ function LandingPage({ onNavigate }) {
       </section>
 
       {/* ── FEATURES ── */}
-      <section style={{ position:"relative", zIndex:10, padding:"0 20px 72px", maxWidth:1080, margin:"0 auto" }}>
+      <section id="features" style={{ position:"relative", zIndex:10, padding:"0 20px 72px", maxWidth:1080, margin:"0 auto", scrollMarginTop:60 }}>
         <div style={{ textAlign:"center", marginBottom:48 }}>
           <p style={{ fontSize:10, fontWeight:700, letterSpacing:"0.12em", textTransform:"uppercase", color:"#475569", marginBottom:10 }}>Platform</p>
           <h2 style={{ fontSize:"clamp(1.6rem,4vw,2.4rem)", fontWeight:800, color:"white", letterSpacing:"-0.02em" }}>Everything you need to learn Python</h2>
@@ -378,7 +378,7 @@ function LandingPage({ onNavigate }) {
       </section>
 
       {/* ── CURRICULUM ── */}
-      <section style={{ position:"relative", zIndex:10, padding:"0 20px 72px", maxWidth:860, margin:"0 auto" }}>
+      <section id="curriculum" style={{ position:"relative", zIndex:10, padding:"0 20px 72px", maxWidth:860, margin:"0 auto", scrollMarginTop:60 }}>
         <div style={{ background:"rgba(15,23,42,0.7)", border:"1px solid rgba(148,163,184,0.08)", borderRadius:20, padding:"28px 24px", backdropFilter:"blur(16px)" }}>
           <div style={{ display:"flex", flexWrap:"wrap", alignItems:"center", justifyContent:"space-between", gap:12, marginBottom:24 }}>
             <div>
@@ -401,6 +401,111 @@ function LandingPage({ onNavigate }) {
                 </div>
               </div>
             ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── FOR TEACHERS ── */}
+      <section id="for-teachers" style={{ position:"relative", zIndex:10, padding:"0 20px 72px", maxWidth:1080, margin:"0 auto", scrollMarginTop:60 }}>
+        <div style={{ textAlign:"center", marginBottom:48 }}>
+          <p style={{ fontSize:10, fontWeight:700, letterSpacing:"0.12em", textTransform:"uppercase", color:"#475569", marginBottom:10 }}>For Educators</p>
+          <h2 style={{ fontSize:"clamp(1.6rem,4vw,2.4rem)", fontWeight:800, color:"white", letterSpacing:"-0.02em" }}>Empower your classroom with AI</h2>
+          <p style={{ fontSize:14, color:"#64748B", marginTop:12, maxWidth:520, margin:"12px auto 0" }}>Real-time insights into every student's progress. Detect struggles before they escalate.</p>
+        </div>
+        <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(240px,1fr))", gap:14 }}>
+          {[
+            { icon:"🔔", title:"Struggle Detection", desc:"Get instant alerts when students hit repeated errors, show frustration, or score low on quizzes.", accent:"#F59E0B" },
+            { icon:"📊", title:"Progress Dashboard", desc:"Track mastery levels across all topics for every student. See who's ahead and who needs help.", accent:"#3B82F6" },
+            { icon:"🧩", title:"AI Exercise Generator", desc:"Generate custom exercises and quizzes with one click. Set topic, difficulty, and assign to students.", accent:"#8B5CF6" },
+            { icon:"👨‍🏫", title:"One-Click Assignment", desc:"Assign targeted exercises to struggling students directly from the alerts dashboard.", accent:"#10B981" },
+          ].map((f,i)=>(
+            <div key={i} style={{ background:"rgba(15,23,42,0.6)", border:`1px solid ${f.accent}25`, borderRadius:14, padding:"24px 22px", backdropFilter:"blur(12px)", transition:"all 0.2s" }}
+              onMouseEnter={e=>{ e.currentTarget.style.transform="translateY(-4px)"; e.currentTarget.style.borderColor=`${f.accent}45`; e.currentTarget.style.boxShadow="0 12px 32px -8px rgba(0,0,0,0.4)"; }}
+              onMouseLeave={e=>{ e.currentTarget.style.transform="translateY(0)"; e.currentTarget.style.borderColor=`${f.accent}25`; e.currentTarget.style.boxShadow="none"; }}
+            >
+              <div style={{ fontSize:28, marginBottom:14 }}>{f.icon}</div>
+              <h3 style={{ fontSize:14, fontWeight:600, color:"#E2E8F0", marginBottom:8 }}>{f.title}</h3>
+              <p style={{ fontSize:12, color:"#64748B", lineHeight:1.65 }}>{f.desc}</p>
+            </div>
+          ))}
+        </div>
+        <div style={{ textAlign:"center", marginTop:36 }}>
+          <button onClick={()=>onNavigate("login")} style={{ fontSize:13, fontWeight:600, padding:"10px 28px", borderRadius:10, background:"linear-gradient(135deg,#3B82F6,#6366F1)", border:"none", color:"white", cursor:"pointer", transition:"all 0.2s" }}
+            onMouseEnter={e=>e.currentTarget.style.transform="translateY(-2px)"}
+            onMouseLeave={e=>e.currentTarget.style.transform="translateY(0)"}
+          >Get Started as a Teacher</button>
+        </div>
+      </section>
+
+      {/* ── PRICING ── */}
+      <section id="pricing" style={{ position:"relative", zIndex:10, padding:"0 20px 80px", maxWidth:1000, margin:"0 auto", scrollMarginTop:60 }}>
+        <div style={{ textAlign:"center", marginBottom:48 }}>
+          <p style={{ fontSize:10, fontWeight:700, letterSpacing:"0.12em", textTransform:"uppercase", color:"#475569", marginBottom:10 }}>Pricing</p>
+          <h2 style={{ fontSize:"clamp(1.6rem,4vw,2.4rem)", fontWeight:800, color:"white", letterSpacing:"-0.02em" }}>Start free. Upgrade when ready.</h2>
+        </div>
+        <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(260px,1fr))", gap:16, alignItems:"start" }}>
+          {/* Free tier */}
+          <div style={{ background:"rgba(15,23,42,0.6)", border:"1px solid rgba(148,163,184,0.1)", borderRadius:16, padding:"28px 24px", backdropFilter:"blur(12px)" }}>
+            <p style={{ fontSize:12, fontWeight:700, textTransform:"uppercase", letterSpacing:"0.08em", color:"#64748B", marginBottom:6 }}>Free</p>
+            <div style={{ display:"flex", alignItems:"baseline", gap:4, marginBottom:16 }}>
+              <span style={{ fontSize:36, fontWeight:800, color:"white" }}>$0</span>
+              <span style={{ fontSize:13, color:"#475569" }}>/month</span>
+            </div>
+            <p style={{ fontSize:12, color:"#64748B", marginBottom:20, lineHeight:1.6 }}>Perfect for getting started with Python</p>
+            <div style={{ display:"flex", flexDirection:"column", gap:10, marginBottom:24 }}>
+              {["10 AI chat messages/day","5 code executions/day","2 quizzes/day","Basic progress tracking","Community support"].map((f,i)=>(
+                <div key={i} style={{ display:"flex", alignItems:"center", gap:8, fontSize:12, color:"#94A3B8" }}>
+                  <span style={{ color:"#3B82F6", fontSize:14 }}>✓</span>{f}
+                </div>
+              ))}
+            </div>
+            <button onClick={()=>onNavigate("login")} style={{ width:"100%", fontSize:13, fontWeight:600, padding:"10px 0", borderRadius:10, background:"rgba(59,130,246,0.1)", border:"1px solid rgba(59,130,246,0.25)", color:"#93C5FD", cursor:"pointer", transition:"all 0.15s" }}
+              onMouseEnter={e=>e.currentTarget.style.background="rgba(59,130,246,0.2)"}
+              onMouseLeave={e=>e.currentTarget.style.background="rgba(59,130,246,0.1)"}
+            >Get Started Free</button>
+          </div>
+
+          {/* Pro tier */}
+          <div style={{ background:"rgba(59,130,246,0.08)", border:"1px solid rgba(59,130,246,0.3)", borderRadius:16, padding:"28px 24px", backdropFilter:"blur(12px)", position:"relative" }}>
+            <div style={{ position:"absolute", top:-10, left:"50%", transform:"translateX(-50%)", fontSize:10, fontWeight:700, textTransform:"uppercase", letterSpacing:"0.1em", padding:"4px 14px", borderRadius:99, background:"linear-gradient(135deg,#3B82F6,#6366F1)", color:"white" }}>Most Popular</div>
+            <p style={{ fontSize:12, fontWeight:700, textTransform:"uppercase", letterSpacing:"0.08em", color:"#3B82F6", marginBottom:6 }}>Pro</p>
+            <div style={{ display:"flex", alignItems:"baseline", gap:4, marginBottom:16 }}>
+              <span style={{ fontSize:36, fontWeight:800, color:"white" }}>$12</span>
+              <span style={{ fontSize:13, color:"#475569" }}>/month</span>
+            </div>
+            <p style={{ fontSize:12, color:"#64748B", marginBottom:20, lineHeight:1.6 }}>Unlimited learning for serious students</p>
+            <div style={{ display:"flex", flexDirection:"column", gap:10, marginBottom:24 }}>
+              {["Unlimited AI chat messages","Unlimited code executions","Unlimited quizzes & exercises","All 8 curriculum modules","Advanced progress analytics","Leaderboard access","Code snippets library","Priority support"].map((f,i)=>(
+                <div key={i} style={{ display:"flex", alignItems:"center", gap:8, fontSize:12, color:"#E2E8F0" }}>
+                  <span style={{ color:"#3B82F6", fontSize:14 }}>✓</span>{f}
+                </div>
+              ))}
+            </div>
+            <button onClick={()=>onNavigate("login")} style={{ width:"100%", fontSize:13, fontWeight:600, padding:"10px 0", borderRadius:10, background:"linear-gradient(135deg,#3B82F6,#6366F1)", border:"none", color:"white", cursor:"pointer", transition:"all 0.15s" }}
+              onMouseEnter={e=>e.currentTarget.style.transform="translateY(-1px)"}
+              onMouseLeave={e=>e.currentTarget.style.transform="translateY(0)"}
+            >Start Pro Trial</button>
+          </div>
+
+          {/* School tier */}
+          <div style={{ background:"rgba(15,23,42,0.6)", border:"1px solid rgba(148,163,184,0.1)", borderRadius:16, padding:"28px 24px", backdropFilter:"blur(12px)" }}>
+            <p style={{ fontSize:12, fontWeight:700, textTransform:"uppercase", letterSpacing:"0.08em", color:"#64748B", marginBottom:6 }}>School</p>
+            <div style={{ display:"flex", alignItems:"baseline", gap:4, marginBottom:16 }}>
+              <span style={{ fontSize:36, fontWeight:800, color:"white" }}>$8</span>
+              <span style={{ fontSize:13, color:"#475569" }}>/student/mo</span>
+            </div>
+            <p style={{ fontSize:12, color:"#64748B", marginBottom:20, lineHeight:1.6 }}>Built for classrooms and institutions</p>
+            <div style={{ display:"flex", flexDirection:"column", gap:10, marginBottom:24 }}>
+              {["Everything in Pro","Teacher dashboard","Real-time struggle alerts","AI exercise generator","One-click assignment","Class management","Student analytics export","Dedicated support"].map((f,i)=>(
+                <div key={i} style={{ display:"flex", alignItems:"center", gap:8, fontSize:12, color:"#94A3B8" }}>
+                  <span style={{ color:"#10B981", fontSize:14 }}>✓</span>{f}
+                </div>
+              ))}
+            </div>
+            <button onClick={()=>onNavigate("login")} style={{ width:"100%", fontSize:13, fontWeight:600, padding:"10px 0", borderRadius:10, background:"rgba(16,185,129,0.1)", border:"1px solid rgba(16,185,129,0.25)", color:"#6EE7B7", cursor:"pointer", transition:"all 0.15s" }}
+              onMouseEnter={e=>e.currentTarget.style.background="rgba(16,185,129,0.2)"}
+              onMouseLeave={e=>e.currentTarget.style.background="rgba(16,185,129,0.1)"}
+            >Contact Sales</button>
           </div>
         </div>
       </section>
@@ -3446,6 +3551,7 @@ export default function App() {
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
         *, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
+        html { scroll-behavior:smooth; }
         html, body { background:var(--lf-bg,#0F172A); font-family:'Inter',system-ui,sans-serif; height:100%; transition:background 0.3s; }
         ::-webkit-scrollbar { width:4px; height:4px; }
         ::-webkit-scrollbar-track { background:transparent; }
