@@ -634,6 +634,7 @@ function LoginPage({ onLogin, onDemoLogin, onBack }) {
 // ══════════════════════════════════════════════════════════════════════════════
 const NAV_ITEMS = [
   { id:"dashboard", label:"Dashboard", emoji:"⊞" },
+  { id:"learn",     label:"Learn",     emoji:"📚", studentOnly:true },
   { id:"progress",  label:"Progress",  emoji:"📈" },
   { id:"settings",  label:"Settings",  emoji:"⚙️" },
 ];
@@ -660,7 +661,7 @@ function Sidebar({ expanded, setExpanded, activePage, setActivePage, role, onLog
           </div>
         )}
         <nav style={{ flex:1, padding:"8px", display:"flex", flexDirection:"column", gap:2 }}>
-          {NAV_ITEMS.map(n=>{
+          {NAV_ITEMS.filter(n=>!n.studentOnly||role==="student").map(n=>{
             const active=activePage===n.id;
             return <button key={n.id} onClick={()=>{ setActivePage(n.id); if(isMobile) onClose(); }} style={{ display:"flex", alignItems:"center", gap:9, padding:(expanded||isMobile)?"8px 11px":"8px", justifyContent:(expanded||isMobile)?"flex-start":"center", borderRadius:8, border:"none", cursor:"pointer", background:active?`${accent}15`:"transparent", color:active?accent:"#64748B", fontWeight:active?600:400, fontSize:13, transition:"all 0.15s", width:"100%", position:"relative" }}
               onMouseEnter={e=>{ if(!active){ e.currentTarget.style.background="rgba(148,163,184,0.06)"; e.currentTarget.style.color="#94A3B8"; }}}
@@ -1762,6 +1763,443 @@ function ProgressPage({ user, role }) {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
+// LEARN PAGE (Sidebar — Students only)
+// ══════════════════════════════════════════════════════════════════════════════
+const LEARN_TOPICS = ["Variables","Data Types","Loops","Lists","Functions","OOP","Error Handling","Libraries"];
+
+const BUILD_ASSIGNMENTS = {
+  "Variables": { title: "Build a Calculator", desc: "Create a calculator that takes two numbers and an operator (+, -, *, /) from the user and displays the result. Handle division by zero.", starter: "# Calculator App\n# Ask user for two numbers and an operator\n# Print the result\n\nnum1 = float(input('Enter first number: '))\noperator = input('Enter operator (+, -, *, /): ')\nnum2 = float(input('Enter second number: '))\n\n# Your code here\n" },
+  "Data Types": { title: "Build a Type Converter", desc: "Create a program that takes user input and converts it to different data types (int, float, string, bool, list). Display the converted values and their types.", starter: "# Type Converter\n# Take input and show conversions\n\nuser_input = input('Enter a value: ')\n\n# Convert and display each type\n# Your code here\n" },
+  "Loops": { title: "Build a Number Guessing Game", desc: "Create a game where the computer picks a random number (1-100) and the player guesses. Give hints (too high/low). Track number of attempts.", starter: "# Number Guessing Game\nimport random\n\nsecret = random.randint(1, 100)\nattempts = 0\n\nprint('I picked a number between 1 and 100!')\n\n# Your game loop here\n" },
+  "Lists": { title: "Build a Contact Book", desc: "Create a contact book that can add, search, delete, and list contacts. Each contact has a name, phone, and email. Use a list of dictionaries.", starter: "# Contact Book\ncontacts = []\n\ndef add_contact(name, phone, email):\n    # Your code here\n    pass\n\ndef search_contact(name):\n    # Your code here\n    pass\n\ndef list_contacts():\n    # Your code here\n    pass\n\n# Test your contact book\nadd_contact('Alice', '555-0101', 'alice@email.com')\nadd_contact('Bob', '555-0102', 'bob@email.com')\nlist_contacts()\nprint(search_contact('Alice'))\n" },
+  "Functions": { title: "Build a Password Generator", desc: "Create a function that generates random passwords with configurable length, uppercase, lowercase, numbers, and special characters. Include a strength checker.", starter: "# Password Generator\nimport random\nimport string\n\ndef generate_password(length=12, uppercase=True, numbers=True, special=True):\n    # Your code here\n    pass\n\ndef check_strength(password):\n    # Return: weak, medium, or strong\n    pass\n\n# Test\npwd = generate_password(16)\nprint(f'Password: {pwd}')\nprint(f'Strength: {check_strength(pwd)}')\n" },
+  "OOP": { title: "Build a Bank Account System", desc: "Create a BankAccount class with deposit, withdraw, transfer methods. Add an InterestAccount subclass. Track transaction history.", starter: "# Bank Account System\n\nclass BankAccount:\n    def __init__(self, owner, balance=0):\n        self.owner = owner\n        self.balance = balance\n        self.history = []\n\n    def deposit(self, amount):\n        # Your code here\n        pass\n\n    def withdraw(self, amount):\n        # Your code here\n        pass\n\n    def transfer(self, other, amount):\n        # Your code here\n        pass\n\nclass InterestAccount(BankAccount):\n    def __init__(self, owner, balance=0, rate=0.05):\n        super().__init__(owner, balance)\n        self.rate = rate\n\n    def apply_interest(self):\n        # Your code here\n        pass\n\n# Test\nacc1 = BankAccount('Alice', 1000)\nacc2 = InterestAccount('Bob', 500)\nacc1.deposit(200)\nacc1.transfer(acc2, 300)\nacc2.apply_interest()\nprint(f'{acc1.owner}: ${acc1.balance}')\nprint(f'{acc2.owner}: ${acc2.balance}')\n" },
+  "Error Handling": { title: "Build a Safe Input Validator", desc: "Create a robust input validator that handles: number parsing, email format, date parsing, age range. Every function must use try/except with specific error types.", starter: "# Safe Input Validator\n\ndef get_number(prompt):\n    # Keep asking until valid number\n    # Handle ValueError\n    pass\n\ndef validate_email(email):\n    # Check format, raise ValueError if invalid\n    pass\n\ndef validate_age(age_str):\n    # Must be int, 0-150 range\n    # Handle ValueError, out of range\n    pass\n\n# Test all validators\ntry:\n    validate_email('test@example.com')\n    print('Email valid!')\n    validate_age('25')\n    print('Age valid!')\n    validate_age('200')\nexcept ValueError as e:\n    print(f'Error: {e}')\n" },
+  "Libraries": { title: "Build a Weather App", desc: "Create a program that uses the json and datetime libraries to process weather data. Parse a JSON weather forecast, display formatted output with dates.", starter: "# Weather App\nimport json\nfrom datetime import datetime, timedelta\n\n# Sample weather data (simulating API response)\nweather_json = '''\n{\n  \"city\": \"San Francisco\",\n  \"forecast\": [\n    {\"date\": \"2024-01-15\", \"temp_high\": 15, \"temp_low\": 8, \"condition\": \"Sunny\"},\n    {\"date\": \"2024-01-16\", \"temp_high\": 13, \"temp_low\": 7, \"condition\": \"Cloudy\"},\n    {\"date\": \"2024-01-17\", \"temp_high\": 11, \"temp_low\": 6, \"condition\": \"Rainy\"}\n  ]\n}\n'''\n\n# Parse and display weather\n# Your code here\n" },
+};
+
+function LearnPage({ user }) {
+  const token = typeof window !== "undefined" ? localStorage.getItem("lf_token") : null;
+  const authHeaders = token ? { Authorization: `Bearer ${token}` } : {};
+  const [topics, setTopics] = useState([]);
+  const [activeTopic, setActiveTopic] = useState(null);
+  const [lesson, setLesson] = useState(null);
+  const [lessonLoading, setLessonLoading] = useState(false);
+  const [activeStep, setActiveStep] = useState("lesson");
+  const [loading, setLoading] = useState(true);
+  const [practiceCode, setPracticeCode] = useState({});
+  const [practiceResults, setPracticeResults] = useState({});
+  const [runningEx, setRunningEx] = useState(null);
+  const [extraExercises, setExtraExercises] = useState([]);
+  const [genDifficulty, setGenDifficulty] = useState("medium");
+  const [generating, setGenerating] = useState(false);
+  const [quizAnswers, setQuizAnswers] = useState({});
+  const [quizSubmitted, setQuizSubmitted] = useState(false);
+  const [quizScore, setQuizScore] = useState(null);
+  const [buildCode, setBuildCode] = useState("");
+  const [buildResult, setBuildResult] = useState(null);
+  const [buildRunning, setBuildRunning] = useState(false);
+  const [toast, setToast] = useState(null);
+
+  const loadStatus = () => {
+    fetch("/api/learn/status", { headers: authHeaders })
+      .then(r => r.json()).then(d => { if (d.topics) setTopics(d.topics); })
+      .catch(() => {}).finally(() => setLoading(false));
+  };
+  useEffect(loadStatus, []);
+
+  const openTopic = (t) => {
+    if (!t.unlocked) return;
+    setActiveTopic(t);
+    setActiveStep(t.current_step === "done" ? "lesson" : t.current_step);
+    setLesson(null);
+    setLessonLoading(true);
+    setPracticeResults({});
+    setPracticeCode({});
+    setExtraExercises([]);
+    setQuizAnswers({});
+    setQuizSubmitted(false);
+    setQuizScore(null);
+    setBuildCode(BUILD_ASSIGNMENTS[t.topic]?.starter || "# Your code here\n");
+    setBuildResult(null);
+    fetch(`/api/learn/topic?topic=${encodeURIComponent(t.topic)}`, { headers: authHeaders })
+      .then(r => r.json()).then(d => { if (d.lesson) setLesson(d.lesson); })
+      .catch(() => {}).finally(() => setLessonLoading(false));
+  };
+
+  const markComplete = async (step) => {
+    await fetch("/api/learn/complete", {
+      method: "POST", headers: { ...authHeaders, "Content-Type": "application/json" },
+      body: JSON.stringify({ topic: activeTopic.topic, step })
+    });
+    loadStatus();
+    setToast({ message: `${step.charAt(0).toUpperCase() + step.slice(1)} completed!`, type: "success" });
+    setTimeout(() => setToast(null), 3000);
+  };
+
+  const runExercise = async (idx) => {
+    const allExercises = [...(lesson?.practice_exercises || []), ...extraExercises];
+    const code = practiceCode[idx] || allExercises[idx]?.starter_code || "";
+    setRunningEx(idx);
+    try {
+      const res = await fetch("/api/execute", {
+        method: "POST", headers: { ...authHeaders, "Content-Type": "application/json" },
+        body: JSON.stringify({ code })
+      });
+      const data = await res.json();
+      setPracticeResults(prev => ({ ...prev, [idx]: { output: data.output || data.error || "No output", success: !data.error } }));
+    } catch { setPracticeResults(prev => ({ ...prev, [idx]: { output: "Execution failed", success: false } })); }
+    setRunningEx(null);
+  };
+
+  const generateMore = async () => {
+    setGenerating(true);
+    try {
+      const res = await fetch("/api/learn/practice", {
+        method: "POST", headers: { ...authHeaders, "Content-Type": "application/json" },
+        body: JSON.stringify({ topic: activeTopic.topic, difficulty: genDifficulty })
+      });
+      const data = await res.json();
+      if (data.exercise) setExtraExercises(prev => [...prev, data.exercise]);
+    } catch {}
+    setGenerating(false);
+  };
+
+  const runBuild = async () => {
+    setBuildRunning(true);
+    try {
+      const res = await fetch("/api/execute", {
+        method: "POST", headers: { ...authHeaders, "Content-Type": "application/json" },
+        body: JSON.stringify({ code: buildCode })
+      });
+      const data = await res.json();
+      setBuildResult({ output: data.output || data.error || "No output", success: !data.error });
+    } catch { setBuildResult({ output: "Execution failed", success: false }); }
+    setBuildRunning(false);
+  };
+
+  if (loading) return <div style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:12}}><LoadingSpinner size={28} color="#3B82F6"/><span style={{fontSize:12,color:"#64748B"}}>Loading learning path...</span></div>;
+
+  // Topic list view
+  if (!activeTopic) {
+    const completed = topics.filter(t => t.completed).length;
+    return (
+      <div style={{flex:1,overflowY:"auto",padding:"20px 14px"}}>
+        {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
+        <div style={{maxWidth:600,margin:"0 auto"}}>
+          <div style={{fontSize:18,fontWeight:800,color:"#F1F5F9",marginBottom:4}}>Learning Path</div>
+          <div style={{fontSize:12,color:"#64748B",marginBottom:16}}>{completed} of {topics.length} topics completed</div>
+          <div style={{display:"flex",gap:4,marginBottom:20,height:6,borderRadius:99,overflow:"hidden",background:"rgba(148,163,184,0.08)"}}>
+            {topics.map((t,i) => (
+              <div key={i} style={{flex:1,background:t.completed?"#10B981":t.unlocked&&!t.completed?"#3B82F6":"transparent",borderRadius:99,transition:"background 0.3s"}}/>
+            ))}
+          </div>
+          <div style={{display:"grid",gap:8}}>
+            {topics.map((t,i) => {
+              const isLocked = !t.unlocked;
+              const isCurrent = t.unlocked && !t.completed;
+              const isDone = t.completed;
+              return (
+                <div key={t.topic} onClick={() => openTopic(t)}
+                  style={{background:isCurrent?"rgba(59,130,246,0.06)":isDone?"rgba(16,185,129,0.04)":"rgba(30,41,59,0.4)",
+                    border:`1px solid ${isCurrent?"rgba(59,130,246,0.2)":isDone?"rgba(16,185,129,0.15)":"rgba(148,163,184,0.07)"}`,
+                    borderRadius:12,padding:"16px 18px",cursor:isLocked?"not-allowed":"pointer",opacity:isLocked?0.5:1,transition:"all 0.2s"}}>
+                  <div style={{display:"flex",alignItems:"center",gap:12}}>
+                    <div style={{width:36,height:36,borderRadius:10,flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,fontWeight:800,
+                      background:isDone?"rgba(16,185,129,0.12)":isCurrent?"rgba(59,130,246,0.12)":"rgba(148,163,184,0.08)",
+                      color:isDone?"#10B981":isCurrent?"#3B82F6":"#475569",border:`1px solid ${isDone?"rgba(16,185,129,0.2)":isCurrent?"rgba(59,130,246,0.2)":"rgba(148,163,184,0.1)"}`}}>
+                      {isDone?"✓":isLocked?"🔒":String(i+1).padStart(2,"0")}
+                    </div>
+                    <div style={{flex:1}}>
+                      <div style={{fontSize:14,fontWeight:600,color:isLocked?"#475569":"#E2E8F0"}}>{t.topic}</div>
+                      <div style={{fontSize:11,color:"#64748B",marginTop:2}}>
+                        {isDone?"Completed":isCurrent?(t.current_step==="lesson"?"Start lesson":"Continue — "+t.current_step):"Complete previous topic to unlock"}
+                      </div>
+                    </div>
+                    <div style={{display:"flex",gap:4}}>
+                      {["lesson","practice","quiz","build"].map(s => (
+                        <div key={s} style={{width:8,height:8,borderRadius:99,background:t[s+"_done"]?"#10B981":isCurrent&&t.current_step===s?"#3B82F6":"rgba(148,163,184,0.15)"}}/>
+                      ))}
+                    </div>
+                    {!isLocked && <span style={{fontSize:14,color:"#64748B"}}>→</span>}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Active topic view
+  const steps = [
+    { id: "lesson", label: "Read", icon: "📖", done: activeTopic.lesson_done },
+    { id: "practice", label: "Practice", icon: "💪", done: activeTopic.practice_done },
+    { id: "quiz", label: "Prove", icon: "🏆", done: activeTopic.quiz_done },
+    { id: "build", label: "Build", icon: "🛠️", done: activeTopic.build_done },
+  ];
+  const stepIdx = steps.findIndex(s => s.id === activeStep);
+
+  return (
+    <div style={{flex:1,overflowY:"auto",padding:"20px 14px"}}>
+      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
+      <div style={{maxWidth:700,margin:"0 auto"}}>
+        {/* Back + Topic header */}
+        <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:16}}>
+          <button onClick={() => { setActiveTopic(null); loadStatus(); }}
+            style={{width:32,height:32,borderRadius:8,border:"1px solid rgba(148,163,184,0.1)",background:"rgba(30,41,59,0.6)",color:"#94A3B8",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontSize:14}}>←</button>
+          <div>
+            <div style={{fontSize:18,fontWeight:800,color:"#F1F5F9"}}>{activeTopic.topic}</div>
+            <div style={{fontSize:11,color:"#64748B"}}>Step {stepIdx+1} of 4 — {steps[stepIdx]?.label}</div>
+          </div>
+        </div>
+
+        {/* Step tabs */}
+        <div style={{display:"flex",gap:6,marginBottom:20}}>
+          {steps.map(s => (
+            <button key={s.id} onClick={() => setActiveStep(s.id)}
+              style={{flex:1,padding:"10px 8px",borderRadius:10,border:`1px solid ${activeStep===s.id?"rgba(59,130,246,0.3)":"rgba(148,163,184,0.07)"}`,
+                background:activeStep===s.id?"rgba(59,130,246,0.08)":"rgba(30,41,59,0.4)",cursor:"pointer",textAlign:"center",transition:"all 0.15s"}}>
+              <div style={{fontSize:16,marginBottom:2}}>{s.done?"✅":s.icon}</div>
+              <div style={{fontSize:11,fontWeight:600,color:activeStep===s.id?"#93C5FD":"#64748B"}}>{s.label}</div>
+            </button>
+          ))}
+        </div>
+
+        {lessonLoading && <div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:12,padding:40}}><LoadingSpinner size={28} color="#3B82F6"/><span style={{fontSize:12,color:"#64748B"}}>Generating lesson...</span></div>}
+
+        {/* ── LESSON STEP ── */}
+        {!lessonLoading && lesson && activeStep === "lesson" && (
+          <div style={{display:"grid",gap:14}}>
+            <div style={{background:"rgba(30,41,59,0.5)",border:"1px solid rgba(148,163,184,0.07)",borderRadius:12,padding:"18px 20px"}}>
+              <div style={{fontSize:15,fontWeight:700,color:"#F1F5F9",marginBottom:10}}>{lesson.title}</div>
+              <div style={{fontSize:13,color:"#CBD5E1",lineHeight:1.8,whiteSpace:"pre-wrap"}}>{lesson.explanation}</div>
+            </div>
+            <div style={{background:"rgba(30,41,59,0.5)",border:"1px solid rgba(148,163,184,0.07)",borderRadius:12,padding:"18px 20px"}}>
+              <div style={{fontSize:13,fontWeight:700,color:"#FBBF24",marginBottom:8}}>Why It Matters</div>
+              <div style={{fontSize:12,color:"#94A3B8",lineHeight:1.7}}>{lesson.why_it_matters}</div>
+            </div>
+            <div style={{background:"rgba(30,41,59,0.5)",border:"1px solid rgba(59,130,246,0.1)",borderRadius:12,padding:"18px 20px"}}>
+              <div style={{fontSize:13,fontWeight:700,color:"#60A5FA",marginBottom:8}}>Real-World Analogy</div>
+              <div style={{fontSize:12,color:"#94A3B8",lineHeight:1.7}}>{lesson.real_world}</div>
+            </div>
+            {lesson.code_examples?.map((ex, i) => (
+              <div key={i} style={{background:"rgba(30,41,59,0.5)",border:"1px solid rgba(148,163,184,0.07)",borderRadius:12,padding:"18px 20px"}}>
+                <div style={{fontSize:12,fontWeight:600,color:"#E2E8F0",marginBottom:8}}>Example {i+1}: {ex.title}</div>
+                <pre style={{background:"rgba(15,23,42,0.7)",borderRadius:8,padding:"12px 14px",fontSize:12,color:"#93C5FD",overflow:"auto",marginBottom:8,fontFamily:"monospace",lineHeight:1.6}}>{ex.code}</pre>
+                <div style={{fontSize:11,color:"#64748B"}}>{ex.explanation}</div>
+              </div>
+            ))}
+            {lesson.key_rules?.length > 0 && (
+              <div style={{background:"rgba(30,41,59,0.5)",border:"1px solid rgba(245,158,11,0.1)",borderRadius:12,padding:"18px 20px"}}>
+                <div style={{fontSize:13,fontWeight:700,color:"#F59E0B",marginBottom:10}}>Key Rules</div>
+                <div style={{display:"grid",gap:6}}>
+                  {lesson.key_rules.map((r, i) => (
+                    <div key={i} style={{display:"flex",gap:8,alignItems:"flex-start"}}>
+                      <span style={{fontSize:11,color:"#F59E0B",flexShrink:0,marginTop:1}}>•</span>
+                      <span style={{fontSize:12,color:"#94A3B8",lineHeight:1.6}}>{r}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            {!activeTopic.lesson_done && (
+              <button onClick={() => { markComplete("lesson"); setActiveStep("practice"); setActiveTopic(prev => ({...prev, lesson_done: true, current_step: "practice"})); }}
+                style={{padding:"12px",borderRadius:10,border:"none",background:"linear-gradient(135deg,#1D4ED8,#2563EB)",color:"white",fontWeight:600,fontSize:13,cursor:"pointer"}}>
+                Mark Lesson Complete & Continue to Practice →
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* ── PRACTICE STEP ── */}
+        {!lessonLoading && lesson && activeStep === "practice" && (
+          <div style={{display:"grid",gap:12}}>
+            <div style={{fontSize:13,color:"#64748B",marginBottom:4}}>Complete the exercises below. Want more? Generate additional practice at any difficulty.</div>
+            {[...(lesson.practice_exercises || []), ...extraExercises].map((ex, idx) => {
+              const result = practiceResults[idx];
+              const diffColor = ex.difficulty === "easy" ? "#10B981" : ex.difficulty === "medium" ? "#FBBF24" : "#F43F5E";
+              return (
+                <div key={idx} style={{background:"rgba(30,41,59,0.5)",border:"1px solid rgba(148,163,184,0.07)",borderRadius:12,padding:"18px 20px"}}>
+                  <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
+                    <span style={{fontSize:9,fontWeight:700,padding:"2px 8px",borderRadius:99,background:`${diffColor}15`,color:diffColor,textTransform:"uppercase"}}>{ex.difficulty}</span>
+                    <span style={{fontSize:13,fontWeight:600,color:"#E2E8F0"}}>{ex.title}</span>
+                    {idx >= (lesson.practice_exercises?.length || 0) && <span style={{fontSize:9,fontWeight:600,padding:"2px 6px",borderRadius:99,background:"rgba(139,92,246,0.1)",color:"#A78BFA"}}>bonus</span>}
+                  </div>
+                  <div style={{fontSize:12,color:"#94A3B8",marginBottom:10,lineHeight:1.6}}>{ex.description}</div>
+                  <textarea
+                    value={practiceCode[idx] ?? ex.starter_code ?? ""}
+                    onChange={e => setPracticeCode(prev => ({ ...prev, [idx]: e.target.value }))}
+                    style={{width:"100%",minHeight:80,background:"rgba(15,23,42,0.7)",border:"1px solid rgba(148,163,184,0.1)",borderRadius:8,padding:"10px 12px",fontSize:12,color:"#93C5FD",fontFamily:"monospace",resize:"vertical",outline:"none"}}
+                  />
+                  <div style={{display:"flex",gap:8,marginTop:8}}>
+                    <button onClick={() => runExercise(idx)} disabled={runningEx === idx}
+                      style={{padding:"8px 16px",borderRadius:8,border:"none",background:"rgba(59,130,246,0.15)",color:"#60A5FA",fontWeight:600,fontSize:12,cursor:"pointer",opacity:runningEx===idx?0.6:1}}>
+                      {runningEx === idx ? "Running..." : "Run Code"}
+                    </button>
+                  </div>
+                  {result && (
+                    <pre style={{marginTop:8,background:result.success?"rgba(16,185,129,0.06)":"rgba(244,63,94,0.06)",border:`1px solid ${result.success?"rgba(16,185,129,0.15)":"rgba(244,63,94,0.15)"}`,borderRadius:8,padding:"10px 12px",fontSize:11,color:result.success?"#34D399":"#FB7185",fontFamily:"monospace",overflow:"auto",whiteSpace:"pre-wrap"}}>{result.output}</pre>
+                  )}
+                </div>
+              );
+            })}
+
+            {/* Generate More Practice */}
+            <div style={{background:"rgba(30,41,59,0.5)",border:"1px dashed rgba(139,92,246,0.25)",borderRadius:12,padding:"16px 20px"}}>
+              <div style={{fontSize:13,fontWeight:600,color:"#A78BFA",marginBottom:10}}>Want More Practice?</div>
+              <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
+                <div style={{display:"flex",borderRadius:8,overflow:"hidden",border:"1px solid rgba(148,163,184,0.1)"}}>
+                  {["easy","medium","hard"].map(d => (
+                    <button key={d} onClick={() => setGenDifficulty(d)}
+                      style={{padding:"6px 12px",border:"none",fontSize:11,fontWeight:600,cursor:"pointer",textTransform:"capitalize",
+                        background:genDifficulty===d?"rgba(139,92,246,0.15)":"rgba(30,41,59,0.4)",
+                        color:genDifficulty===d?"#A78BFA":"#64748B"}}>
+                      {d}
+                    </button>
+                  ))}
+                </div>
+                <button onClick={generateMore} disabled={generating}
+                  style={{padding:"7px 16px",borderRadius:8,border:"none",background:"rgba(139,92,246,0.15)",color:"#A78BFA",fontWeight:600,fontSize:12,cursor:"pointer",opacity:generating?0.6:1}}>
+                  {generating ? "Generating..." : "Generate Exercise"}
+                </button>
+              </div>
+            </div>
+
+            {!activeTopic.practice_done && (
+              <button onClick={() => { markComplete("practice"); setActiveStep("quiz"); setActiveTopic(prev => ({...prev, practice_done: true, current_step: "quiz"})); }}
+                style={{padding:"12px",borderRadius:10,border:"none",background:"linear-gradient(135deg,#1D4ED8,#2563EB)",color:"white",fontWeight:600,fontSize:13,cursor:"pointer"}}>
+                Mark Practice Complete & Continue to Quiz →
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* ── QUIZ STEP ── */}
+        {!lessonLoading && lesson && activeStep === "quiz" && (
+          <div style={{display:"grid",gap:12}}>
+            <div style={{fontSize:13,color:"#64748B",marginBottom:4}}>Answer these questions to prove your understanding. Score 70%+ to proceed to the final build.</div>
+            {(lesson.key_rules || []).map((rule, idx) => {
+              const isCorrect = quizSubmitted && quizAnswers[idx] === "true";
+              return (
+                <div key={idx} style={{background:"rgba(30,41,59,0.5)",border:`1px solid ${quizSubmitted?(isCorrect?"rgba(16,185,129,0.2)":"rgba(244,63,94,0.2)"):"rgba(148,163,184,0.07)"}`,borderRadius:12,padding:"16px 18px"}}>
+                  <div style={{fontSize:13,fontWeight:600,color:"#E2E8F0",marginBottom:10}}>Q{idx+1}: Is this statement true about {activeTopic.topic}?</div>
+                  <div style={{fontSize:12,color:"#CBD5E1",marginBottom:12,padding:"8px 12px",background:"rgba(15,23,42,0.5)",borderRadius:8,fontStyle:"italic"}}>"{rule}"</div>
+                  <div style={{display:"flex",gap:8}}>
+                    {["true","false"].map(opt => (
+                      <button key={opt} onClick={() => !quizSubmitted && setQuizAnswers(prev => ({...prev, [idx]: opt}))}
+                        style={{flex:1,padding:"8px",borderRadius:8,border:`1px solid ${quizAnswers[idx]===opt?"rgba(59,130,246,0.3)":"rgba(148,163,184,0.1)"}`,
+                          background:quizAnswers[idx]===opt?"rgba(59,130,246,0.1)":"rgba(30,41,59,0.4)",color:quizAnswers[idx]===opt?"#93C5FD":"#64748B",
+                          fontWeight:600,fontSize:12,cursor:quizSubmitted?"default":"pointer",textTransform:"capitalize"}}>
+                        {opt === "true" ? "True" : "False"}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+            {!quizSubmitted ? (
+              <button onClick={() => {
+                const total = (lesson.key_rules || []).length;
+                const correct = Object.values(quizAnswers).filter(a => a === "true").length;
+                const score = total > 0 ? Math.round((correct / total) * 100) : 0;
+                setQuizScore(score);
+                setQuizSubmitted(true);
+                if (score >= 70) {
+                  markComplete("quiz");
+                  setActiveTopic(prev => ({...prev, quiz_done: true, current_step: "build"}));
+                }
+              }}
+                disabled={Object.keys(quizAnswers).length < (lesson.key_rules || []).length}
+                style={{padding:"12px",borderRadius:10,border:"none",background:Object.keys(quizAnswers).length<(lesson.key_rules||[]).length?"rgba(148,163,184,0.1)":"linear-gradient(135deg,#1D4ED8,#2563EB)",
+                  color:Object.keys(quizAnswers).length<(lesson.key_rules||[]).length?"#475569":"white",fontWeight:600,fontSize:13,cursor:Object.keys(quizAnswers).length<(lesson.key_rules||[]).length?"not-allowed":"pointer"}}>
+                Submit Quiz
+              </button>
+            ) : (
+              <div style={{background:quizScore>=70?"rgba(16,185,129,0.06)":"rgba(244,63,94,0.06)",border:`1px solid ${quizScore>=70?"rgba(16,185,129,0.2)":"rgba(244,63,94,0.2)"}`,borderRadius:12,padding:"18px 20px",textAlign:"center"}}>
+                <div style={{fontSize:28,fontWeight:800,color:quizScore>=70?"#10B981":"#F43F5E",marginBottom:6}}>{quizScore}%</div>
+                <div style={{fontSize:13,color:quizScore>=70?"#34D399":"#FB7185",fontWeight:600}}>
+                  {quizScore >= 70 ? "Passed! Continue to the Build challenge." : "Not quite — review the lesson and try again."}
+                </div>
+                {quizScore < 70 && (
+                  <button onClick={() => { setQuizAnswers({}); setQuizSubmitted(false); setQuizScore(null); }}
+                    style={{marginTop:12,padding:"8px 20px",borderRadius:8,border:"none",background:"rgba(244,63,94,0.12)",color:"#FB7185",fontWeight:600,fontSize:12,cursor:"pointer"}}>
+                    Retry Quiz
+                  </button>
+                )}
+                {quizScore >= 70 && (
+                  <button onClick={() => setActiveStep("build")}
+                    style={{marginTop:12,padding:"8px 20px",borderRadius:8,border:"none",background:"rgba(16,185,129,0.12)",color:"#34D399",fontWeight:600,fontSize:12,cursor:"pointer"}}>
+                    Continue to Build →
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── BUILD STEP ── */}
+        {!lessonLoading && activeStep === "build" && (() => {
+          const assignment = BUILD_ASSIGNMENTS[activeTopic.topic];
+          if (!assignment) return <div style={{color:"#64748B",textAlign:"center",padding:40}}>No build assignment for this topic yet.</div>;
+          return (
+            <div style={{display:"grid",gap:14}}>
+              <div style={{background:"linear-gradient(135deg,rgba(139,92,246,0.08),rgba(59,130,246,0.08))",border:"1px solid rgba(139,92,246,0.2)",borderRadius:14,padding:"20px 22px"}}>
+                <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
+                  <span style={{fontSize:20}}>🛠️</span>
+                  <div>
+                    <div style={{fontSize:16,fontWeight:700,color:"#F1F5F9"}}>{assignment.title}</div>
+                    <div style={{fontSize:11,color:"#A78BFA",fontWeight:600}}>Final Project — {activeTopic.topic}</div>
+                  </div>
+                </div>
+                <div style={{fontSize:13,color:"#CBD5E1",lineHeight:1.7,marginTop:8}}>{assignment.desc}</div>
+              </div>
+
+              <div style={{background:"rgba(30,41,59,0.5)",border:"1px solid rgba(148,163,184,0.07)",borderRadius:12,padding:"18px 20px"}}>
+                <div style={{fontSize:12,fontWeight:600,color:"#E2E8F0",marginBottom:8}}>Your Code</div>
+                <textarea
+                  value={buildCode}
+                  onChange={e => setBuildCode(e.target.value)}
+                  style={{width:"100%",minHeight:180,background:"rgba(15,23,42,0.7)",border:"1px solid rgba(148,163,184,0.1)",borderRadius:8,padding:"12px 14px",fontSize:12,color:"#93C5FD",fontFamily:"monospace",resize:"vertical",outline:"none",lineHeight:1.6}}
+                />
+                <div style={{display:"flex",gap:8,marginTop:10}}>
+                  <button onClick={runBuild} disabled={buildRunning}
+                    style={{padding:"8px 20px",borderRadius:8,border:"none",background:"rgba(59,130,246,0.15)",color:"#60A5FA",fontWeight:600,fontSize:12,cursor:"pointer",opacity:buildRunning?0.6:1}}>
+                    {buildRunning ? "Running..." : "Run Code"}
+                  </button>
+                  {!activeTopic.build_done && (
+                    <button onClick={() => { markComplete("build"); setActiveTopic(prev => ({...prev, build_done: true, current_step: "done", completed: true})); }}
+                      style={{padding:"8px 20px",borderRadius:8,border:"none",background:"linear-gradient(135deg,#059669,#10B981)",color:"white",fontWeight:600,fontSize:12,cursor:"pointer"}}>
+                      Submit & Complete Topic
+                    </button>
+                  )}
+                </div>
+                {buildResult && (
+                  <pre style={{marginTop:10,background:buildResult.success?"rgba(16,185,129,0.06)":"rgba(244,63,94,0.06)",border:`1px solid ${buildResult.success?"rgba(16,185,129,0.15)":"rgba(244,63,94,0.15)"}`,borderRadius:8,padding:"10px 12px",fontSize:11,color:buildResult.success?"#34D399":"#FB7185",fontFamily:"monospace",overflow:"auto",whiteSpace:"pre-wrap"}}>{buildResult.output}</pre>
+                )}
+              </div>
+
+              {activeTopic.build_done && (
+                <div style={{background:"rgba(16,185,129,0.06)",border:"1px solid rgba(16,185,129,0.2)",borderRadius:12,padding:"18px 20px",textAlign:"center"}}>
+                  <div style={{fontSize:24,marginBottom:6}}>🎉</div>
+                  <div style={{fontSize:16,fontWeight:700,color:"#10B981",marginBottom:4}}>Topic Complete!</div>
+                  <div style={{fontSize:12,color:"#34D399",marginBottom:12}}>You've mastered {activeTopic.topic}. The next topic is now unlocked.</div>
+                  <button onClick={() => { setActiveTopic(null); loadStatus(); }}
+                    style={{padding:"8px 24px",borderRadius:8,border:"none",background:"rgba(16,185,129,0.12)",color:"#34D399",fontWeight:600,fontSize:12,cursor:"pointer"}}>
+                    Back to Learning Path
+                  </button>
+                </div>
+              )}
+            </div>
+          );
+        })()}
+      </div>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
 // SETTINGS PAGE (Sidebar)
 // ══════════════════════════════════════════════════════════════════════════════
 function SettingsPage({ user, role }) {
@@ -1867,6 +2305,7 @@ function AppShell({ role, user, onLogout }) {
         <div style={{flex:1,overflow:"hidden",display:"flex",flexDirection:"column"}}>
           {activePage==="dashboard"&&role==="student"&&<StudentDashboard user={user}/>}
           {activePage==="dashboard"&&role==="teacher"&&<TeacherDashboard user={user}/>}
+          {activePage==="learn"&&role==="student"&&<LearnPage user={user}/>}
           {activePage==="progress"&&<ProgressPage user={user} role={role}/>}
           {activePage==="settings"&&<SettingsPage user={user} role={role}/>}
         </div>
