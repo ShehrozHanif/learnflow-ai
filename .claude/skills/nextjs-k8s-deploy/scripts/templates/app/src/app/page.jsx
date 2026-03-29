@@ -633,11 +633,12 @@ function LoginPage({ onLogin, onDemoLogin, onBack }) {
 // SIDEBAR
 // ══════════════════════════════════════════════════════════════════════════════
 const NAV_ITEMS = [
-  { id:"dashboard", label:"Dashboard", emoji:"⊞" },
-  { id:"learn",     label:"Learn",     emoji:"📚", studentOnly:true },
-  { id:"teachers",  label:"Teachers",  emoji:"👨‍🏫", studentOnly:true },
-  { id:"progress",  label:"Progress",  emoji:"📈" },
-  { id:"settings",  label:"Settings",  emoji:"⚙️" },
+  { id:"dashboard",    label:"Dashboard",    emoji:"⊞" },
+  { id:"learn",        label:"Learn",        emoji:"📚", studentOnly:true },
+  { id:"teachers",     label:"Teachers",     emoji:"👨‍🏫", studentOnly:true },
+  { id:"leaderboard",  label:"Leaderboard",  emoji:"🏆" },
+  { id:"progress",     label:"Progress",     emoji:"📈" },
+  { id:"settings",     label:"Settings",     emoji:"⚙️" },
 ];
 function Sidebar({ expanded, setExpanded, activePage, setActivePage, role, onLogout, isMobile, onClose }) {
   const accent = role==="teacher"?"#10B981":"#3B82F6";
@@ -2395,6 +2396,130 @@ function LearnPage({ user }) {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
+// LEADERBOARD PAGE (Sidebar)
+// ══════════════════════════════════════════════════════════════════════════════
+function LeaderboardPage({ user }) {
+  const [period, setPeriod] = useState("all");
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const authHeaders = { Authorization: `Bearer ${typeof window!=="undefined"?localStorage.getItem("lf_token")||"":""}` };
+
+  const load = (p) => {
+    setLoading(true);
+    fetch(`/api/leaderboard?period=${p}`, { headers: authHeaders })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d) setData(d); })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(() => { load(period); }, [period]);
+
+  const podiumColors = ["#F59E0B","#94A3B8","#CD7F32"]; // gold, silver, bronze
+  const podiumBg = ["rgba(245,158,11,0.08)","rgba(148,163,184,0.06)","rgba(205,127,50,0.06)"];
+  const podiumBorder = ["rgba(245,158,11,0.25)","rgba(148,163,184,0.15)","rgba(205,127,50,0.2)"];
+  const medals = ["🥇","🥈","🥉"];
+
+  return (
+    <div style={{flex:1,overflowY:"auto",padding:"20px 14px"}}>
+      <div style={{maxWidth:600,margin:"0 auto"}}>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:20}}>
+          <div>
+            <div style={{fontSize:20,fontWeight:800,color:"#F1F5F9"}}>Leaderboard</div>
+            <div style={{fontSize:12,color:"#64748B",marginTop:2}}>See how you rank among all students</div>
+          </div>
+          <div style={{display:"flex",background:"rgba(30,41,59,0.6)",borderRadius:10,border:"1px solid rgba(148,163,184,0.08)",overflow:"hidden"}}>
+            {[{id:"all",label:"All Time"},{id:"weekly",label:"This Week"}].map(t=>(
+              <button key={t.id} onClick={()=>setPeriod(t.id)} style={{padding:"7px 14px",border:"none",background:period===t.id?"rgba(59,130,246,0.15)":"transparent",color:period===t.id?"#60A5FA":"#64748B",fontSize:12,fontWeight:period===t.id?700:500,cursor:"pointer",transition:"all 0.15s"}}>{t.label}</button>
+            ))}
+          </div>
+        </div>
+
+        {loading ? <LoadingSpinner /> : !data || data.leaderboard.length === 0 ? (
+          <div style={{textAlign:"center",padding:"60px 20px",color:"#475569",fontSize:13}}>No students have started learning yet. Be the first!</div>
+        ) : (
+          <>
+            {/* Podium — Top 3 */}
+            {data.leaderboard.length >= 3 && (
+              <div style={{display:"flex",alignItems:"flex-end",justifyContent:"center",gap:8,marginBottom:24,padding:"10px 0"}}>
+                {[1,0,2].map(idx => {
+                  const s = data.leaderboard[idx];
+                  if (!s) return null;
+                  const isCenter = idx === 0;
+                  const h = isCenter ? 120 : 95;
+                  return (
+                    <div key={s.id} style={{display:"flex",flexDirection:"column",alignItems:"center",width:isCenter?140:110}}>
+                      <div style={{fontSize:isCenter?28:22,marginBottom:4}}>{medals[idx]}</div>
+                      <div style={{width:isCenter?52:42,height:isCenter?52:42,borderRadius:"50%",background:`linear-gradient(135deg,${s.color},${s.color}99)`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:isCenter?18:14,fontWeight:800,color:"white",border:`3px solid ${podiumColors[idx]}`,marginBottom:6}}>{s.initials}</div>
+                      <div style={{fontSize:isCenter?14:12,fontWeight:700,color:"#E2E8F0",textAlign:"center",marginBottom:2,maxWidth:"100%",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{s.name}{s.is_me?" (You)":""}</div>
+                      <div style={{fontSize:isCenter?20:16,fontWeight:800,color:podiumColors[idx],marginBottom:4}}>{s.avg_mastery}%</div>
+                      <div style={{width:"100%",height:h,background:podiumBg[idx],border:`1px solid ${podiumBorder[idx]}`,borderRadius:"12px 12px 0 0",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:4}}>
+                        <div style={{fontSize:10,color:"#94A3B8"}}>🔥 {s.streak}d streak</div>
+                        <div style={{fontSize:10,color:"#94A3B8"}}>{s.topics_started} topics</div>
+                        <div style={{fontSize:10,color:"#94A3B8"}}>{s.code_runs} runs</div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* My Rank Card (if not in top 3) */}
+            {data.my_rank && data.my_rank.rank > 3 && (
+              <div style={{background:"rgba(59,130,246,0.06)",border:"1px solid rgba(59,130,246,0.2)",borderRadius:12,padding:"14px 16px",marginBottom:16,display:"flex",alignItems:"center",gap:12}}>
+                <div style={{fontSize:12,fontWeight:800,color:"#60A5FA",width:28,textAlign:"center"}}>#{data.my_rank.rank}</div>
+                <div style={{width:36,height:36,borderRadius:"50%",background:"linear-gradient(135deg,#3B82F6,#6366F1)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:700,color:"white"}}>{data.my_rank.initials}</div>
+                <div style={{flex:1}}>
+                  <div style={{fontSize:13,fontWeight:700,color:"#E2E8F0"}}>{data.my_rank.name} (You)</div>
+                  <div style={{fontSize:11,color:"#64748B"}}>{data.my_rank.streak}d streak  ·  {data.my_rank.topics_started} topics  ·  {data.my_rank.code_runs} runs</div>
+                </div>
+                <div style={{fontSize:18,fontWeight:800,color:"#60A5FA"}}>{data.my_rank.avg_mastery}%</div>
+              </div>
+            )}
+
+            {/* Full Rankings List */}
+            <div style={{background:"rgba(30,41,59,0.4)",border:"1px solid rgba(148,163,184,0.07)",borderRadius:14,overflow:"hidden"}}>
+              <div style={{display:"flex",alignItems:"center",padding:"12px 16px",borderBottom:"1px solid rgba(148,163,184,0.07)",fontSize:10,fontWeight:700,color:"#475569",textTransform:"uppercase",letterSpacing:"0.05em"}}>
+                <span style={{width:36}}>Rank</span>
+                <span style={{flex:1}}>Student</span>
+                <span style={{width:60,textAlign:"center"}}>Streak</span>
+                <span style={{width:60,textAlign:"center"}}>Topics</span>
+                <span style={{width:50,textAlign:"center"}}>Runs</span>
+                <span style={{width:60,textAlign:"right"}}>Mastery</span>
+              </div>
+              {data.leaderboard.map((s, i) => (
+                <div key={s.id} style={{display:"flex",alignItems:"center",padding:"10px 16px",borderBottom:i<data.leaderboard.length-1?"1px solid rgba(148,163,184,0.04)":"none",background:s.is_me?"rgba(59,130,246,0.04)":"transparent",transition:"background 0.15s"}}
+                  onMouseEnter={e=>{if(!s.is_me)e.currentTarget.style.background="rgba(148,163,184,0.03)";}}
+                  onMouseLeave={e=>{e.currentTarget.style.background=s.is_me?"rgba(59,130,246,0.04)":"transparent";}}>
+                  <span style={{width:36,fontSize:13,fontWeight:700,color:i<3?podiumColors[i]:"#475569"}}>{i<3?medals[i]:`#${s.rank}`}</span>
+                  <div style={{flex:1,display:"flex",alignItems:"center",gap:10}}>
+                    <div style={{width:30,height:30,borderRadius:"50%",background:`linear-gradient(135deg,${s.color},${s.color}99)`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:700,color:"white",flexShrink:0}}>{s.initials}</div>
+                    <div>
+                      <div style={{fontSize:12,fontWeight:s.is_me?700:600,color:s.is_me?"#60A5FA":"#E2E8F0"}}>{s.name}{s.is_me?" (You)":""}</div>
+                      {s.topics_mastered>0&&<div style={{fontSize:9,color:"#10B981",fontWeight:600}}>{s.topics_mastered} mastered</div>}
+                    </div>
+                  </div>
+                  <span style={{width:60,textAlign:"center",fontSize:12,color:"#F59E0B",fontWeight:600}}>🔥{s.streak}d</span>
+                  <span style={{width:60,textAlign:"center",fontSize:12,color:"#94A3B8"}}>{s.topics_started}</span>
+                  <span style={{width:50,textAlign:"center",fontSize:12,color:"#94A3B8"}}>{s.code_runs}</span>
+                  <div style={{width:60,textAlign:"right"}}>
+                    <span style={{fontSize:14,fontWeight:800,color:s.avg_mastery>=91?"#60A5FA":s.avg_mastery>=71?"#10B981":s.avg_mastery>=41?"#F59E0B":"#94A3B8"}}>{s.avg_mastery}%</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div style={{textAlign:"center",padding:"16px",fontSize:11,color:"#334155"}}>
+              {data.leaderboard.length} student{data.leaderboard.length!==1?"s":""} ranked  ·  {period==="weekly"?"This week":"All time"}
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
 // SETTINGS PAGE (Sidebar)
 // ══════════════════════════════════════════════════════════════════════════════
 function SettingsPage({ user, role }) {
@@ -2565,6 +2690,7 @@ function AppShell({ role, user, onLogout }) {
           {activePage==="dashboard"&&role==="teacher"&&<TeacherDashboard user={user}/>}
           {activePage==="learn"&&role==="student"&&<LearnPage user={user}/>}
           {activePage==="teachers"&&role==="student"&&<TeachersPage user={user}/>}
+          {activePage==="leaderboard"&&<LeaderboardPage user={user}/>}
           {activePage==="progress"&&<ProgressPage user={user} role={role}/>}
           {activePage==="settings"&&<SettingsPage user={user} role={role}/>}
         </div>
