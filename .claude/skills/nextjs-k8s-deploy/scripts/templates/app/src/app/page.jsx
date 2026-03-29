@@ -813,11 +813,21 @@ function StudentDashboard({ user }) {
     setExSubmitting(false);
   };
 
+  const getAdaptiveQuizParams=(topicName)=>{
+    const t=topics.find(x=>x.name===topicName);
+    const pct=t?t.pct:0;
+    if(pct>=91) return {difficulty:"advanced",num_questions:Math.floor(Math.random()*4)+12,level:"Mastered"};
+    if(pct>=71) return {difficulty:"advanced",num_questions:10,level:"Proficient"};
+    if(pct>=41) return {difficulty:"intermediate",num_questions:8,level:"Learning"};
+    return {difficulty:"beginner",num_questions:5,level:"Beginner"};
+  };
+
   const generateQuiz=async()=>{
     if(!genQuizTopic||genQuizLoading)return;
     setGenQuizLoading(true);
+    const params=getAdaptiveQuizParams(genQuizTopic);
     try {
-      const res=await fetch("/api/quizzes/generate",{method:"POST",headers:{"Content-Type":"application/json",...authHeaders},body:JSON.stringify({topic:genQuizTopic,difficulty:"beginner",num_questions:5})});
+      const res=await fetch("/api/quizzes/generate",{method:"POST",headers:{"Content-Type":"application/json",...authHeaders},body:JSON.stringify({topic:genQuizTopic,difficulty:params.difficulty,num_questions:params.num_questions})});
       if(!res.ok)throw new Error("Failed to generate quiz");
       const data=await res.json();
       if(data.quiz_id&&data.questions){
@@ -1002,6 +1012,15 @@ function StudentDashboard({ user }) {
                     {genQuizLoading?"Generating...":"Generate Quiz"}
                   </button>
                 </div>
+                {genQuizTopic&&(()=>{const p=getAdaptiveQuizParams(genQuizTopic);const lc=p.level==="Mastered"?"#3B82F6":p.level==="Proficient"?"#10B981":p.level==="Learning"?"#FBBF24":"#F43F5E";return(
+                  <div style={{marginTop:8,display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
+                    <span style={{fontSize:10,fontWeight:600,padding:"2px 8px",borderRadius:99,background:`${lc}15`,color:lc}}>{p.level}</span>
+                    <span style={{fontSize:10,color:"#64748B"}}>{p.num_questions} questions</span>
+                    <span style={{fontSize:10,color:"#475569"}}>•</span>
+                    <span style={{fontSize:10,color:"#64748B"}}>{p.difficulty} difficulty</span>
+                    <span style={{fontSize:10,color:"#475569"}}>•</span>
+                    <span style={{fontSize:10,color:"#475569",fontStyle:"italic"}}>Adapts to your mastery level</span>
+                  </div>);})()}
                 {quizzes.length>0&&<div style={{marginTop:12}}>
                   <div style={{fontSize:11,color:"#475569",marginBottom:6}}>Previous Quizzes:</div>
                   {quizzes.slice(0,5).map(q=>(
