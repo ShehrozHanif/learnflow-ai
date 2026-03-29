@@ -803,6 +803,38 @@ function StudentDashboard({ user, snippetCode, clearSnippetCode }) {
     setSnippetSaving(false);
   };
 
+  // Voice input (Web Speech API)
+  const [listening, setListening] = useState(false);
+  const recognitionRef = useRef(null);
+
+  const toggleVoice = () => {
+    if (listening) {
+      if (recognitionRef.current) recognitionRef.current.stop();
+      setListening(false);
+      return;
+    }
+    const SR = typeof window !== "undefined" && (window.SpeechRecognition || window.webkitSpeechRecognition);
+    if (!SR) { setToast({message:"Voice input not supported in this browser. Try Chrome or Edge.",type:"error"}); return; }
+    const rec = new SR();
+    rec.lang = "en-US";
+    rec.interimResults = true;
+    rec.continuous = true;
+    rec.onresult = (e) => {
+      let transcript = "";
+      for (let i = 0; i < e.results.length; i++) transcript += e.results[i][0].transcript;
+      setInput(transcript);
+    };
+    rec.onerror = (e) => {
+      if (e.error === "not-allowed") setToast({message:"Microphone access denied. Please allow mic access.",type:"error"});
+      else if (e.error !== "aborted") setToast({message:`Voice error: ${e.error}`,type:"error"});
+      setListening(false);
+    };
+    rec.onend = () => setListening(false);
+    recognitionRef.current = rec;
+    rec.start();
+    setListening(true);
+  };
+
   // Load assignments + quizzes
   useEffect(()=>{
     if(isDemo) return;
@@ -913,7 +945,11 @@ function StudentDashboard({ user, snippetCode, clearSnippetCode }) {
               <div style={{flex:1,background:"rgba(30,41,59,0.9)",border:"1px solid rgba(148,163,184,0.1)",borderRadius:12,padding:"9px 12px"}}>
                 <textarea value={input} onChange={e=>setInput(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();send();}}} placeholder="Ask anything about Python…" rows={1} style={{width:"100%",resize:"none",fontSize:14,background:"transparent",border:"none",color:"#E2E8F0",lineHeight:1.55,maxHeight:80,fontFamily:"inherit"}}/>
               </div>
-              <button onClick={send} style={{width:38,height:38,borderRadius:10,flexShrink:0,background:input.trim()?"linear-gradient(135deg,#2563EB,#3B82F6)":"rgba(30,41,59,0.8)",border:input.trim()?"none":"1px solid rgba(148,163,184,0.1)",cursor:input.trim()?"pointer":"default",display:"flex",alignItems:"center",justifyContent:"center",color:input.trim()?"white":"#334155",transition:"all 0.18s"}}>
+              <button onClick={toggleVoice} title={listening?"Stop listening":"Voice input"} style={{width:38,height:38,borderRadius:10,flexShrink:0,background:listening?"rgba(244,63,94,0.15)":"rgba(30,41,59,0.8)",border:listening?"1px solid rgba(244,63,94,0.3)":"1px solid rgba(148,163,184,0.1)",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",color:listening?"#FB7185":"#64748B",transition:"all 0.18s",position:"relative"}}>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{width:15,height:15}}><path strokeLinecap="round" strokeLinejoin="round" d="M12 18.75a6 6 0 006-6v-1.5m-6 7.5a6 6 0 01-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 01-3-3V4.5a3 3 0 116 0v8.25a3 3 0 01-3 3z"/></svg>
+                {listening&&<span style={{position:"absolute",inset:-3,borderRadius:12,border:"2px solid rgba(244,63,94,0.4)",animation:"pulse2 1.5s ease-in-out infinite"}}/>}
+              </button>
+              <button onClick={()=>{if(listening&&recognitionRef.current){recognitionRef.current.stop();setListening(false);}send();}} style={{width:38,height:38,borderRadius:10,flexShrink:0,background:input.trim()?"linear-gradient(135deg,#2563EB,#3B82F6)":"rgba(30,41,59,0.8)",border:input.trim()?"none":"1px solid rgba(148,163,184,0.1)",cursor:input.trim()?"pointer":"default",display:"flex",alignItems:"center",justifyContent:"center",color:input.trim()?"white":"#334155",transition:"all 0.18s"}}>
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" style={{width:14,height:14}}><path strokeLinecap="round" strokeLinejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5"/></svg>
               </button>
             </div>
