@@ -66,7 +66,7 @@ export async function GET(req: NextRequest) {
   } catch { /* table may not exist */ }
 
   // Determine stuck topics (from alerts)
-  const stuckTopics = [...new Set(alertRows.map(a => a.topic))];
+  const stuckTopics = Array.from(new Set(alertRows.map(a => a.topic)));
 
   return NextResponse.json({
     student: {

@@ -635,6 +635,7 @@ function LoginPage({ onLogin, onDemoLogin, onBack }) {
 const NAV_ITEMS = [
   { id:"dashboard", label:"Dashboard", emoji:"⊞" },
   { id:"learn",     label:"Learn",     emoji:"📚", studentOnly:true },
+  { id:"teachers",  label:"Teachers",  emoji:"👨‍🏫", studentOnly:true },
   { id:"progress",  label:"Progress",  emoji:"📈" },
   { id:"settings",  label:"Settings",  emoji:"⚙️" },
 ];
@@ -1148,6 +1149,7 @@ function TeacherDashboard({ user }) {
   const [generating,setGenerating]=useState(false);
   const [generatedEx,setGeneratedEx]=useState(null);
   const [students,setStudents]=useState(isDemo?STUDENTS:[]);
+  const [unassigned,setUnassigned]=useState([]);
   const [alerts,setAlerts]=useState(isDemo?ALERTS:[]);
   const [assignModal,setAssignModal]=useState(null);
   const [assignStudent,setAssignStudent]=useState("");
@@ -1188,7 +1190,7 @@ function TeacherDashboard({ user }) {
 
   const fetchData = (showLoading=false) => {
     if(isDemo) return;
-    const p1=fetch("/api/teacher/students",{headers:authHeaders}).then(r=>{if(!r.ok)throw new Error();return r.json();}).then(d=>{if(d&&d.students)setStudents(d.students);}).catch(()=>{});
+    const p1=fetch("/api/teacher/students",{headers:authHeaders}).then(r=>{if(!r.ok)throw new Error();return r.json();}).then(d=>{if(d&&d.students)setStudents(d.students);if(d&&d.unassigned)setUnassigned(d.unassigned);}).catch(()=>{});
     const p2=fetch("/api/teacher/alerts",{headers:authHeaders}).then(r=>{if(!r.ok)throw new Error();return r.json();}).then(d=>{if(d&&d.alerts)setAlerts(d.alerts);}).catch(()=>{});
     if(showLoading) Promise.all([p1,p2]).finally(()=>setTeacherLoading(false));
   };
@@ -1336,7 +1338,7 @@ function TeacherDashboard({ user }) {
       </div>}
       <div style={{maxWidth:940,margin:"0 auto",display:"flex",flexDirection:"column",gap:18}}>
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(130px,1fr))",gap:10}}>
-          {[{key:"students",label:"Total Students",value:String(students.length||0),accent:"#3B82F6",e:"👥"},{key:"mastery",label:"Avg Mastery",value:students.length?Math.round(students.reduce((a,s)=>a+s.mastery,0)/students.length)+"%":"0%",accent:"#10B981",e:"📊"},{key:"active",label:"Active Now",value:String(students.filter(s=>s.active).length),accent:"#10B981",e:"⚡",pulse:true},{key:"struggling",label:"Struggling",value:String(students.filter(s=>s.status==="Struggling").length+visible.length),accent:"#F43F5E",e:"⚠️"}].map(c=>(
+          {[{key:"students",label:"My Students",value:String(students.length||0),accent:"#3B82F6",e:"👥"},{key:"unassigned",label:"Unassigned",value:String(unassigned.length||0),accent:"#F59E0B",e:"🆓"},{key:"active",label:"Active Now",value:String([...students,...unassigned].filter(s=>s.active).length),accent:"#10B981",e:"⚡",pulse:true},{key:"struggling",label:"Struggling",value:String([...students,...unassigned].filter(s=>s.status==="Struggling").length+visible.length),accent:"#F43F5E",e:"⚠️"}].map(c=>(
             <div key={c.label} onClick={()=>setStatsExpanded(statsExpanded===c.key?null:c.key)} style={{background:statsExpanded===c.key?"rgba(30,41,59,0.7)":"rgba(30,41,59,0.5)",border:`1px solid ${statsExpanded===c.key?c.accent:c.accent+"20"}`,borderRadius:13,padding:"15px 14px",display:"flex",flexDirection:"column",gap:7,cursor:"pointer",transition:"all 0.2s ease"}}>
               <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}><span style={{fontSize:17}}>{c.e}</span>{c.pulse&&<span style={{width:7,height:7,borderRadius:"50%",background:"#10B981",animation:"pulse2 2s ease-in-out infinite",display:"inline-block"}}/>}</div>
               <div style={{fontSize:22,fontWeight:800,color:"#F1F5F9",letterSpacing:"-0.02em",lineHeight:1}}>{c.value}</div>
@@ -1347,7 +1349,7 @@ function TeacherDashboard({ user }) {
         {statsExpanded&&(
           <div style={{background:"rgba(30,41,59,0.4)",border:"1px solid rgba(148,163,184,0.1)",borderRadius:14,padding:"16px",animation:"fadeIn 0.2s ease"}}>
             {statsExpanded==="students"&&(<>
-              <div style={{fontSize:13,fontWeight:700,color:"#F1F5F9",marginBottom:12}}>All Students ({students.length})</div>
+              <div style={{fontSize:13,fontWeight:700,color:"#F1F5F9",marginBottom:12}}>My Students ({students.length})</div>
               <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(200px,1fr))",gap:8}}>
                 {students.map(s=>(
                   <div key={s.id} onClick={()=>openStudentDetail(s.id)} style={{display:"flex",alignItems:"center",gap:8,background:"rgba(15,23,42,0.5)",borderRadius:9,padding:"10px 12px",cursor:"pointer",transition:"border 0.15s",border:"1px solid transparent"}} onMouseEnter={e=>e.currentTarget.style.border="1px solid rgba(148,163,184,0.2)"} onMouseLeave={e=>e.currentTarget.style.border="1px solid transparent"}>
@@ -1359,7 +1361,27 @@ function TeacherDashboard({ user }) {
                     <div style={{fontSize:12,fontWeight:700,color:s.mastery>=71?"#34D399":s.mastery>=41?"#FBBF24":"#FB7185"}}>{s.mastery}%</div>
                   </div>
                 ))}
-                {students.length===0&&<div style={{fontSize:12,color:"#64748B",padding:8}}>No students enrolled yet</div>}
+                {students.length===0&&<div style={{fontSize:12,color:"#64748B",padding:8}}>No students enrolled with you yet</div>}
+              </div>
+            </>)}
+            {statsExpanded==="unassigned"&&(<>
+              <div style={{fontSize:13,fontWeight:700,color:"#F1F5F9",marginBottom:4}}>Unassigned Students ({unassigned.length})</div>
+              <div style={{fontSize:11,color:"#64748B",marginBottom:12}}>Students who haven't picked a mentor yet. You can help them or assign exercises.</div>
+              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(200px,1fr))",gap:8}}>
+                {unassigned.map(s=>(
+                  <div key={s.id} onClick={()=>openStudentDetail(s.id)} style={{display:"flex",alignItems:"center",gap:8,background:"rgba(15,23,42,0.5)",borderRadius:9,padding:"10px 12px",cursor:"pointer",transition:"border 0.15s",border:"1px solid rgba(245,158,11,0.1)"}} onMouseEnter={e=>e.currentTarget.style.border="1px solid rgba(245,158,11,0.25)"} onMouseLeave={e=>e.currentTarget.style.border="1px solid rgba(245,158,11,0.1)"}>
+                    <Avatar initials={s.initials} color={s.color} size={28}/>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontSize:12,fontWeight:600,color:"#E2E8F0",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{s.name}</div>
+                      <div style={{fontSize:10,color:"#475569"}}>{s.module}</div>
+                    </div>
+                    <div style={{display:"flex",alignItems:"center",gap:4}}>
+                      <span style={{fontSize:9,fontWeight:600,padding:"1px 5px",borderRadius:99,background:"rgba(245,158,11,0.1)",color:"#FBBF24"}}>unassigned</span>
+                      <div style={{fontSize:12,fontWeight:700,color:s.mastery>=71?"#34D399":s.mastery>=41?"#FBBF24":"#FB7185"}}>{s.mastery}%</div>
+                    </div>
+                  </div>
+                ))}
+                {unassigned.length===0&&<div style={{fontSize:12,color:"#64748B",padding:8}}>All students have a mentor!</div>}
               </div>
             </>)}
             {statsExpanded==="mastery"&&(<>
@@ -1777,6 +1799,160 @@ function ProgressPage({ user, role }) {
           </div>
         </>)}
       </div>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// TEACHERS PAGE (Sidebar — Students browse & pick mentor)
+// ══════════════════════════════════════════════════════════════════════════════
+function TeachersPage({ user }) {
+  const token = typeof window !== "undefined" ? localStorage.getItem("lf_token") : null;
+  const authHeaders = token ? { Authorization: `Bearer ${token}` } : {};
+  const [teachers, setTeachers] = useState([]);
+  const [myMentorId, setMyMentorId] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [selectedTeacher, setSelectedTeacher] = useState(null);
+  const [enrolling, setEnrolling] = useState(false);
+  const [toast, setToast] = useState(null);
+
+  useEffect(() => {
+    fetch("/api/teachers/list", { headers: authHeaders })
+      .then(r => r.json()).then(d => { if (d.teachers) { setTeachers(d.teachers); setMyMentorId(d.my_mentor_id); } })
+      .catch(() => {}).finally(() => setLoading(false));
+  }, []);
+
+  const enroll = async (teacherId) => {
+    setEnrolling(true);
+    try {
+      const res = await fetch("/api/teachers/enroll", {
+        method: "POST", headers: { ...authHeaders, "Content-Type": "application/json" },
+        body: JSON.stringify({ teacher_id: teacherId })
+      });
+      if (res.ok) {
+        setMyMentorId(teacherId);
+        setTeachers(prev => prev.map(t => ({ ...t, is_my_mentor: t.id === teacherId, student_count: t.id === teacherId ? t.student_count + 1 : (t.is_my_mentor ? t.student_count - 1 : t.student_count) })));
+        setSelectedTeacher(null);
+        setToast({ message: "Mentor selected successfully!", type: "success" });
+        setTimeout(() => setToast(null), 3000);
+      }
+    } catch {}
+    setEnrolling(false);
+  };
+
+  if (loading) return <div style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:12}}><LoadingSpinner size={28} color="#3B82F6"/><span style={{fontSize:12,color:"#64748B"}}>Loading teachers...</span></div>;
+
+  return (
+    <div style={{flex:1,overflowY:"auto",padding:"20px 14px"}}>
+      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
+      <div style={{maxWidth:600,margin:"0 auto"}}>
+        <div style={{fontSize:18,fontWeight:800,color:"#F1F5F9",marginBottom:4}}>Faculty</div>
+        <div style={{fontSize:12,color:"#64748B",marginBottom:16}}>
+          {myMentorId ? "You have a mentor. You can switch anytime." : "Choose a mentor to get personalized guidance."}
+        </div>
+
+        {/* Current mentor banner */}
+        {myMentorId && (() => {
+          const mentor = teachers.find(t => t.id === myMentorId);
+          if (!mentor) return null;
+          return (
+            <div style={{background:"rgba(16,185,129,0.06)",border:"1px solid rgba(16,185,129,0.2)",borderRadius:12,padding:"14px 16px",marginBottom:16,display:"flex",alignItems:"center",gap:12}}>
+              <div style={{width:36,height:36,borderRadius:"50%",background:"linear-gradient(135deg,#10B981,#059669)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,fontWeight:700,color:"white",flexShrink:0}}>{mentor.initials}</div>
+              <div style={{flex:1}}>
+                <div style={{fontSize:13,fontWeight:600,color:"#E2E8F0"}}>{mentor.name}</div>
+                <div style={{fontSize:11,color:"#34D399"}}>Your current mentor</div>
+              </div>
+              <span style={{fontSize:9,fontWeight:700,padding:"3px 8px",borderRadius:99,background:"rgba(16,185,129,0.12)",color:"#34D399"}}>Enrolled</span>
+            </div>
+          );
+        })()}
+
+        {/* Teacher list */}
+        <div style={{display:"grid",gap:10}}>
+          {teachers.map(t => (
+            <div key={t.id} onClick={() => setSelectedTeacher(t)}
+              style={{background:t.is_my_mentor?"rgba(16,185,129,0.04)":"rgba(30,41,59,0.4)",border:`1px solid ${t.is_my_mentor?"rgba(16,185,129,0.15)":"rgba(148,163,184,0.07)"}`,borderRadius:12,padding:"16px 18px",cursor:"pointer",transition:"all 0.2s"}}
+              onMouseEnter={e=>{e.currentTarget.style.borderColor=t.is_my_mentor?"rgba(16,185,129,0.3)":"rgba(59,130,246,0.2)";}}
+              onMouseLeave={e=>{e.currentTarget.style.borderColor=t.is_my_mentor?"rgba(16,185,129,0.15)":"rgba(148,163,184,0.07)";}}>
+              <div style={{display:"flex",alignItems:"center",gap:12}}>
+                <div style={{width:42,height:42,borderRadius:"50%",background:`linear-gradient(135deg,${t.color},${t.color}99)`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,fontWeight:700,color:"white",flexShrink:0}}>{t.initials}</div>
+                <div style={{flex:1}}>
+                  <div style={{display:"flex",alignItems:"center",gap:6}}>
+                    <span style={{fontSize:14,fontWeight:600,color:"#E2E8F0"}}>{t.name}</span>
+                    {t.is_my_mentor && <span style={{fontSize:9,fontWeight:700,padding:"1px 6px",borderRadius:99,background:"rgba(16,185,129,0.12)",color:"#34D399"}}>My Mentor</span>}
+                  </div>
+                  <div style={{fontSize:11,color:"#64748B",marginTop:2}}>{t.specialization || "Python Instructor"}</div>
+                  <div style={{display:"flex",gap:10,marginTop:4,fontSize:10,color:"#475569"}}>
+                    <span>{t.student_count} student{t.student_count!==1?"s":""}</span>
+                    {t.experience && <><span>·</span><span>{t.experience}</span></>}
+                  </div>
+                </div>
+                <span style={{fontSize:14,color:"#64748B"}}>→</span>
+              </div>
+            </div>
+          ))}
+          {teachers.length === 0 && <div style={{fontSize:12,color:"#64748B",textAlign:"center",padding:20}}>No teachers available yet.</div>}
+        </div>
+      </div>
+
+      {/* Teacher Profile Modal */}
+      {selectedTeacher && (
+        <div onClick={() => setSelectedTeacher(null)} style={{position:"fixed",inset:0,zIndex:100,background:"rgba(0,0,0,0.7)",backdropFilter:"blur(8px)",display:"flex",alignItems:"center",justifyContent:"center",padding:16,animation:"fadein 0.2s ease"}}>
+          <div onClick={e=>e.stopPropagation()} style={{background:"#0F172A",border:"1px solid rgba(148,163,184,0.15)",borderRadius:18,padding:"28px 24px",maxWidth:480,width:"100%",maxHeight:"80vh",overflowY:"auto",boxShadow:"0 24px 64px -16px rgba(0,0,0,0.6)"}}>
+            {/* Header */}
+            <div style={{display:"flex",alignItems:"center",gap:14,marginBottom:20}}>
+              <div style={{width:56,height:56,borderRadius:"50%",background:`linear-gradient(135deg,${selectedTeacher.color},${selectedTeacher.color}99)`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,fontWeight:700,color:"white",flexShrink:0}}>{selectedTeacher.initials}</div>
+              <div style={{flex:1}}>
+                <div style={{fontSize:18,fontWeight:700,color:"#F1F5F9"}}>{selectedTeacher.name}</div>
+                <div style={{fontSize:12,color:"#64748B"}}>{selectedTeacher.specialization || "Python Instructor"}</div>
+                <div style={{fontSize:11,color:"#475569",marginTop:2}}>{selectedTeacher.student_count} student{selectedTeacher.student_count!==1?"s":""} enrolled</div>
+              </div>
+              <button onClick={() => setSelectedTeacher(null)} style={{width:30,height:30,borderRadius:8,border:"1px solid rgba(148,163,184,0.1)",background:"rgba(30,41,59,0.6)",color:"#94A3B8",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontSize:16}}>x</button>
+            </div>
+
+            {/* Bio */}
+            {selectedTeacher.bio && (
+              <div style={{background:"rgba(30,41,59,0.5)",border:"1px solid rgba(148,163,184,0.07)",borderRadius:10,padding:"14px 16px",marginBottom:12}}>
+                <div style={{fontSize:12,fontWeight:600,color:"#E2E8F0",marginBottom:6}}>About</div>
+                <div style={{fontSize:12,color:"#94A3B8",lineHeight:1.7}}>{selectedTeacher.bio}</div>
+              </div>
+            )}
+
+            {/* Details */}
+            <div style={{display:"grid",gap:8,marginBottom:16}}>
+              {[
+                { label: "Education", value: selectedTeacher.education, icon: "🎓" },
+                { label: "Experience", value: selectedTeacher.experience, icon: "💼" },
+                { label: "Specialization", value: selectedTeacher.specialization, icon: "🎯" },
+                { label: "Achievements", value: selectedTeacher.achievements, icon: "🏆" },
+              ].filter(d => d.value).map(d => (
+                <div key={d.label} style={{background:"rgba(30,41,59,0.5)",border:"1px solid rgba(148,163,184,0.07)",borderRadius:10,padding:"12px 14px",display:"flex",gap:10,alignItems:"flex-start"}}>
+                  <span style={{fontSize:16,flexShrink:0}}>{d.icon}</span>
+                  <div>
+                    <div style={{fontSize:11,fontWeight:600,color:"#64748B",textTransform:"uppercase",letterSpacing:"0.05em",marginBottom:3}}>{d.label}</div>
+                    <div style={{fontSize:12,color:"#CBD5E1",lineHeight:1.6}}>{d.value}</div>
+                  </div>
+                </div>
+              ))}
+              {!selectedTeacher.education && !selectedTeacher.experience && !selectedTeacher.specialization && !selectedTeacher.achievements && !selectedTeacher.bio && (
+                <div style={{fontSize:12,color:"#475569",textAlign:"center",padding:12}}>This teacher hasn't completed their profile yet.</div>
+              )}
+            </div>
+
+            {/* Enroll button */}
+            {selectedTeacher.is_my_mentor ? (
+              <div style={{padding:"12px",borderRadius:10,background:"rgba(16,185,129,0.08)",border:"1px solid rgba(16,185,129,0.2)",textAlign:"center"}}>
+                <span style={{fontSize:13,fontWeight:600,color:"#34D399"}}>This is your current mentor ✓</span>
+              </div>
+            ) : (
+              <button onClick={() => enroll(selectedTeacher.id)} disabled={enrolling}
+                style={{width:"100%",padding:"12px",borderRadius:10,border:"none",background:"linear-gradient(135deg,#1D4ED8,#2563EB)",color:"white",fontWeight:600,fontSize:13,cursor:"pointer",opacity:enrolling?0.7:1}}>
+                {enrolling ? "Enrolling..." : myMentorId ? "Switch to This Mentor" : "Choose as My Mentor"}
+              </button>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -2225,6 +2401,34 @@ function SettingsPage({ user, role }) {
   const [darkMode, setDarkMode] = useState(true);
   const [fontSize, setFontSize] = useState(14);
   const [toast, setToast] = useState(null);
+  const [profile, setProfile] = useState({ education:"", experience:"", specialization:"", achievements:"", bio:"" });
+  const [profileLoading, setProfileLoading] = useState(false);
+  const [profileSaving, setProfileSaving] = useState(false);
+
+  useEffect(() => {
+    if (role === "teacher") {
+      setProfileLoading(true);
+      const token = localStorage.getItem("lf_token");
+      fetch("/api/teachers/profile", { headers: { Authorization: `Bearer ${token}` } })
+        .then(r => r.json())
+        .then(data => setProfile({ education: data.education||"", experience: data.experience||"", specialization: data.specialization||"", achievements: data.achievements||"", bio: data.bio||"" }))
+        .catch(() => {})
+        .finally(() => setProfileLoading(false));
+    }
+  }, [role]);
+
+  const saveProfile = async () => {
+    setProfileSaving(true);
+    try {
+      const token = localStorage.getItem("lf_token");
+      const res = await fetch("/api/teachers/profile", { method:"POST", headers:{"Content-Type":"application/json", Authorization:`Bearer ${token}`}, body: JSON.stringify(profile) });
+      if (res.ok) setToast({message:"Profile saved successfully!",type:"success"});
+      else setToast({message:"Failed to save profile",type:"error"});
+    } catch(e) { setToast({message:"Network error",type:"error"}); }
+    setProfileSaving(false);
+  };
+
+  const inputStyle = {width:"100%",background:"rgba(15,23,42,0.5)",border:"1px solid rgba(148,163,184,0.12)",borderRadius:8,padding:"10px 12px",fontSize:12,color:"#E2E8F0",outline:"none",fontFamily:"inherit",resize:"vertical"};
 
   return (
     <div style={{flex:1,overflowY:"auto",padding:"20px 14px"}}>
@@ -2248,6 +2452,41 @@ function SettingsPage({ user, role }) {
             </div>
           </div>
         </div>
+
+        {role==="teacher"&&(
+          <div style={{background:"rgba(30,41,59,0.4)",border:"1px solid rgba(148,163,184,0.07)",borderRadius:14,padding:"20px",marginBottom:14}}>
+            <div style={{fontSize:13,fontWeight:700,color:"#E2E8F0",marginBottom:4}}>Teacher Profile</div>
+            <div style={{fontSize:11,color:"#64748B",marginBottom:16}}>This information is visible to students browsing the Faculty page</div>
+            {profileLoading ? <LoadingSpinner/> : (
+              <div style={{display:"grid",gap:14}}>
+                <div>
+                  <label style={{fontSize:11,fontWeight:600,color:"#94A3B8",marginBottom:4,display:"block"}}>Education</label>
+                  <input value={profile.education} onChange={e=>setProfile(p=>({...p,education:e.target.value}))} placeholder="e.g. PhD Computer Science, Stanford University" style={inputStyle}/>
+                </div>
+                <div>
+                  <label style={{fontSize:11,fontWeight:600,color:"#94A3B8",marginBottom:4,display:"block"}}>Experience</label>
+                  <input value={profile.experience} onChange={e=>setProfile(p=>({...p,experience:e.target.value}))} placeholder="e.g. 10 years teaching Python & ML" style={inputStyle}/>
+                </div>
+                <div>
+                  <label style={{fontSize:11,fontWeight:600,color:"#94A3B8",marginBottom:4,display:"block"}}>Specialization</label>
+                  <input value={profile.specialization} onChange={e=>setProfile(p=>({...p,specialization:e.target.value}))} placeholder="e.g. Machine Learning, Data Science, Web Development" style={inputStyle}/>
+                </div>
+                <div>
+                  <label style={{fontSize:11,fontWeight:600,color:"#94A3B8",marginBottom:4,display:"block"}}>Achievements</label>
+                  <textarea value={profile.achievements} onChange={e=>setProfile(p=>({...p,achievements:e.target.value}))} placeholder="e.g. Published 20+ papers, Google AI Mentor Award" rows={2} style={inputStyle}/>
+                </div>
+                <div>
+                  <label style={{fontSize:11,fontWeight:600,color:"#94A3B8",marginBottom:4,display:"block"}}>Bio</label>
+                  <textarea value={profile.bio} onChange={e=>setProfile(p=>({...p,bio:e.target.value}))} placeholder="Tell students about yourself and your teaching style..." rows={3} style={inputStyle}/>
+                </div>
+                <button onClick={saveProfile} disabled={profileSaving}
+                  style={{padding:"10px 0",borderRadius:8,border:"none",background:"linear-gradient(135deg,#10B981,#059669)",color:"white",fontWeight:700,fontSize:13,cursor:"pointer",opacity:profileSaving?0.6:1,marginTop:4}}>
+                  {profileSaving ? "Saving..." : "Save Profile"}
+                </button>
+              </div>
+            )}
+          </div>
+        )}
         <div style={{background:"rgba(30,41,59,0.4)",border:"1px solid rgba(148,163,184,0.07)",borderRadius:14,padding:"20px",marginBottom:14}}>
           <div style={{fontSize:13,fontWeight:700,color:"#E2E8F0",marginBottom:14}}>Appearance</div>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
@@ -2325,6 +2564,7 @@ function AppShell({ role, user, onLogout }) {
           {activePage==="dashboard"&&role==="student"&&<StudentDashboard user={user}/>}
           {activePage==="dashboard"&&role==="teacher"&&<TeacherDashboard user={user}/>}
           {activePage==="learn"&&role==="student"&&<LearnPage user={user}/>}
+          {activePage==="teachers"&&role==="student"&&<TeachersPage user={user}/>}
           {activePage==="progress"&&<ProgressPage user={user} role={role}/>}
           {activePage==="settings"&&<SettingsPage user={user} role={role}/>}
         </div>
