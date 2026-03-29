@@ -635,12 +635,13 @@ function LoginPage({ onLogin, onDemoLogin, onBack }) {
 const NAV_ITEMS = [
   { id:"dashboard",    label:"Dashboard",    emoji:"⊞" },
   { id:"learn",        label:"Learn",        emoji:"📚", studentOnly:true },
+  { id:"history",      label:"Chat History", emoji:"🗂️", studentOnly:true },
   { id:"teachers",     label:"Teachers",     emoji:"👨‍🏫", studentOnly:true },
   { id:"leaderboard",  label:"Leaderboard",  emoji:"🏆" },
   { id:"progress",     label:"Progress",     emoji:"📈" },
   { id:"settings",     label:"Settings",     emoji:"⚙️" },
 ];
-function Sidebar({ expanded, setExpanded, activePage, setActivePage, role, onLogout, isMobile, onClose, theme }) {
+function Sidebar({ expanded, setExpanded, activePage, setActivePage, role, user, onLogout, isMobile, onClose, theme }) {
   const accent = role==="teacher"?"#10B981":"#3B82F6";
   const grad   = role==="teacher"?"linear-gradient(135deg,#10B981,#059669)":"linear-gradient(135deg,#3B82F6,#6366F1)";
   return (
@@ -655,9 +656,9 @@ function Sidebar({ expanded, setExpanded, activePage, setActivePage, role, onLog
         </div>
         {(expanded||isMobile) && (
           <div style={{ margin:"10px 8px 4px", padding:"9px 11px", background:"var(--lf-surface2)", border:"1px solid var(--lf-border)", borderRadius:10, display:"flex", alignItems:"center", gap:8 }}>
-            <div style={{ width:26, height:26, borderRadius:"50%", background:grad, display:"flex", alignItems:"center", justifyContent:"center", fontSize:10, fontWeight:700, color:"white", flexShrink:0 }}>{role==="teacher"?"R":"M"}</div>
+            <div style={{ width:26, height:26, borderRadius:"50%", background:grad, display:"flex", alignItems:"center", justifyContent:"center", fontSize:10, fontWeight:700, color:"white", flexShrink:0 }}>{user?.name?user.name.split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase():role==="teacher"?"T":"S"}</div>
             <div style={{ minWidth:0 }}>
-              <div style={{ fontSize:12, fontWeight:600, color:"var(--lf-text2)", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{role==="teacher"?"Mr. Rodriguez":"Maya Chen"}</div>
+              <div style={{ fontSize:12, fontWeight:600, color:"var(--lf-text2)", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{user?.name||"User"}</div>
               <div style={{ fontSize:10, color:accent, fontWeight:500, textTransform:"capitalize" }}>{role}</div>
             </div>
           </div>
@@ -2396,6 +2397,140 @@ function LearnPage({ user }) {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
+// CHAT HISTORY PAGE (Sidebar)
+// ══════════════════════════════════════════════════════════════════════════════
+function ChatHistoryPage({ user }) {
+  const [messages, setMessages] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
+  const [expandedDay, setExpandedDay] = useState(null);
+  const authHeaders = { Authorization: `Bearer ${typeof window!=="undefined"?localStorage.getItem("lf_token")||"":""}` };
+
+  useEffect(() => {
+    fetch("/api/chat/history", { headers: authHeaders })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d && d.messages) setMessages(d.messages); })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
+  const filtered = search.trim()
+    ? messages.filter(m => m.text.toLowerCase().includes(search.toLowerCase()) || (m.agent||"").toLowerCase().includes(search.toLowerCase()))
+    : messages;
+
+  // Group by date
+  const grouped = {};
+  filtered.forEach(m => {
+    const d = new Date(m.created_at);
+    const key = d.toLocaleDateString("en-US", { weekday:"long", year:"numeric", month:"long", day:"numeric" });
+    if (!grouped[key]) grouped[key] = [];
+    grouped[key].push(m);
+  });
+  const days = Object.keys(grouped).reverse(); // newest first
+
+  const totalUser = messages.filter(m => m.role === "user").length;
+  const totalAI = messages.filter(m => m.role !== "user").length;
+  const agents = [...new Set(messages.filter(m => m.agent).map(m => m.agent))];
+
+  // Auto-expand first day
+  useEffect(() => { if (days.length > 0 && !expandedDay) setExpandedDay(days[0]); }, [days.length]);
+
+  return (
+    <div style={{flex:1,overflowY:"auto",padding:"20px 14px"}}>
+      <div style={{maxWidth:640,margin:"0 auto"}}>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16}}>
+          <div>
+            <div style={{fontSize:20,fontWeight:800,color:"#F1F5F9"}}>Chat History</div>
+            <div style={{fontSize:12,color:"#64748B",marginTop:2}}>{messages.length} messages across {days.length} day{days.length!==1?"s":""}</div>
+          </div>
+        </div>
+
+        {/* Stats */}
+        <div style={{display:"flex",gap:8,marginBottom:16,flexWrap:"wrap"}}>
+          {[
+            {emoji:"💬",label:"Your Messages",value:totalUser},
+            {emoji:"🤖",label:"AI Responses",value:totalAI},
+            {emoji:"🧠",label:"Agents Used",value:agents.length},
+          ].map(s=>(
+            <div key={s.label} style={{flex:1,minWidth:100,background:"rgba(30,41,59,0.4)",border:"1px solid rgba(148,163,184,0.07)",borderRadius:10,padding:"10px 12px",textAlign:"center"}}>
+              <div style={{fontSize:16}}>{s.emoji}</div>
+              <div style={{fontSize:16,fontWeight:800,color:"#E2E8F0"}}>{s.value}</div>
+              <div style={{fontSize:10,color:"#475569"}}>{s.label}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* Search */}
+        <div style={{position:"relative",marginBottom:16}}>
+          <svg viewBox="0 0 24 24" fill="none" stroke="#475569" strokeWidth="2" style={{width:14,height:14,position:"absolute",left:12,top:"50%",transform:"translateY(-50%)"}}><path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z"/></svg>
+          <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search messages, agents..."
+            style={{width:"100%",padding:"10px 12px 10px 34px",background:"rgba(30,41,59,0.5)",border:"1px solid rgba(148,163,184,0.1)",borderRadius:10,fontSize:13,color:"#E2E8F0",outline:"none",fontFamily:"inherit"}}/>
+          {search && <button onClick={()=>setSearch("")} style={{position:"absolute",right:10,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",color:"#64748B",cursor:"pointer",fontSize:14}}>x</button>}
+        </div>
+
+        {loading ? <LoadingSpinner /> : filtered.length === 0 ? (
+          <div style={{textAlign:"center",padding:"48px 20px",color:"#475569"}}>
+            <div style={{fontSize:32,marginBottom:8}}>{search?"🔍":"💬"}</div>
+            <div style={{fontSize:14,fontWeight:600,color:"#64748B",marginBottom:4}}>{search?"No messages match your search":"No chat history yet"}</div>
+            <div style={{fontSize:12,color:"#475569"}}>{search?"Try different keywords":"Start a conversation in the Dashboard to see your history here"}</div>
+          </div>
+        ) : (
+          <div style={{display:"flex",flexDirection:"column",gap:6}}>
+            {days.map(day => {
+              const dayMsgs = grouped[day];
+              const isExpanded = expandedDay === day;
+              const userCount = dayMsgs.filter(m=>m.role==="user").length;
+              const aiCount = dayMsgs.length - userCount;
+              return (
+                <div key={day} style={{background:"rgba(30,41,59,0.4)",border:"1px solid rgba(148,163,184,0.07)",borderRadius:12,overflow:"hidden"}}>
+                  <div onClick={()=>setExpandedDay(isExpanded?null:day)}
+                    style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"12px 16px",cursor:"pointer",transition:"background 0.15s"}}
+                    onMouseEnter={e=>{e.currentTarget.style.background="rgba(148,163,184,0.04)";}}
+                    onMouseLeave={e=>{e.currentTarget.style.background="transparent";}}>
+                    <div style={{display:"flex",alignItems:"center",gap:10}}>
+                      <span style={{fontSize:14}}>📅</span>
+                      <div>
+                        <div style={{fontSize:13,fontWeight:600,color:"#E2E8F0"}}>{day}</div>
+                        <div style={{fontSize:11,color:"#64748B"}}>{userCount} sent · {aiCount} received</div>
+                      </div>
+                    </div>
+                    <span style={{fontSize:11,color:"#475569",transition:"transform 0.2s",transform:isExpanded?"rotate(180deg)":"rotate(0)"}}>▼</span>
+                  </div>
+                  {isExpanded && (
+                    <div style={{borderTop:"1px solid rgba(148,163,184,0.05)",padding:"12px 16px",display:"flex",flexDirection:"column",gap:8}}>
+                      {dayMsgs.map(m => {
+                        const isUser = m.role === "user";
+                        const time = new Date(m.created_at).toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"});
+                        return (
+                          <div key={m.id} style={{display:"flex",gap:10,alignItems:"flex-start",flexDirection:isUser?"row-reverse":"row"}}>
+                            <div style={{width:28,height:28,borderRadius:8,flexShrink:0,background:isUser?"linear-gradient(135deg,#1D4ED8,#3B82F6)":"rgba(59,130,246,0.12)",border:isUser?"none":"1px solid rgba(59,130,246,0.2)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,color:"white"}}>
+                              {isUser?(user?.name?user.name[0].toUpperCase():"U"):"🤖"}
+                            </div>
+                            <div style={{flex:1,minWidth:0,maxWidth:"80%"}}>
+                              <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:3,flexDirection:isUser?"row-reverse":"row"}}>
+                                <span style={{fontSize:11,fontWeight:600,color:isUser?"#60A5FA":"#94A3B8"}}>{isUser?(user?.name||"You"):(m.agent||"AI Tutor")}</span>
+                                <span style={{fontSize:10,color:"#334155"}}>{time}</span>
+                              </div>
+                              <div style={{padding:"8px 12px",borderRadius:isUser?"14px 14px 4px 14px":"4px 14px 14px 14px",fontSize:13,lineHeight:1.6,color:isUser?"#EFF6FF":"#CBD5E1",background:isUser?"linear-gradient(135deg,#1D4ED8,#3B82F6)":"rgba(30,41,59,0.7)",border:isUser?"none":"1px solid rgba(148,163,184,0.07)",wordBreak:"break-word"}}>
+                                {m.text.length > 300 ? m.text.slice(0,300)+"..." : m.text}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
 // LEADERBOARD PAGE (Sidebar)
 // ══════════════════════════════════════════════════════════════════════════════
 function LeaderboardPage({ user }) {
@@ -2665,8 +2800,8 @@ function AppShell({ role, user, onLogout, theme, setTheme }) {
 
   return (
     <div style={{display:"flex",height:"100vh",background:"var(--lf-bg,#0F172A)",overflow:"hidden",transition:"background 0.3s"}}>
-      {!isMobile&&<Sidebar expanded={sidebarExpanded} setExpanded={setSidebarExpanded} activePage={activePage} setActivePage={setActivePage} role={role} onLogout={onLogout} isMobile={false} onClose={()=>{}} theme={theme}/>}
-      {isMobile&&<Sidebar expanded={sidebarOpen} setExpanded={setSidebarOpen} activePage={activePage} setActivePage={setActivePage} role={role} onLogout={onLogout} isMobile={true} onClose={()=>setSidebarOpen(false)} theme={theme}/>}
+      {!isMobile&&<Sidebar expanded={sidebarExpanded} setExpanded={setSidebarExpanded} activePage={activePage} setActivePage={setActivePage} role={role} user={user} onLogout={onLogout} isMobile={false} onClose={()=>{}} theme={theme}/>}
+      {isMobile&&<Sidebar expanded={sidebarOpen} setExpanded={setSidebarOpen} activePage={activePage} setActivePage={setActivePage} role={role} user={user} onLogout={onLogout} isMobile={true} onClose={()=>setSidebarOpen(false)} theme={theme}/>}
       <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",minWidth:0}}>
         <div style={{height:50,display:"flex",alignItems:"center",justifyContent:"space-between",padding:"0 14px",background:"var(--lf-header)",borderBottom:"1px solid var(--lf-border)",flexShrink:0,gap:8,transition:"background 0.3s"}}>
           <div style={{display:"flex",alignItems:"center",gap:9}}>
@@ -2691,6 +2826,7 @@ function AppShell({ role, user, onLogout, theme, setTheme }) {
           {activePage==="dashboard"&&role==="teacher"&&<TeacherDashboard user={user}/>}
           {activePage==="learn"&&role==="student"&&<LearnPage user={user}/>}
           {activePage==="teachers"&&role==="student"&&<TeachersPage user={user}/>}
+          {activePage==="history"&&role==="student"&&<ChatHistoryPage user={user}/>}
           {activePage==="leaderboard"&&<LeaderboardPage user={user}/>}
           {activePage==="progress"&&<ProgressPage user={user} role={role}/>}
           {activePage==="settings"&&<SettingsPage user={user} role={role} theme={theme} setTheme={setTheme}/>}
