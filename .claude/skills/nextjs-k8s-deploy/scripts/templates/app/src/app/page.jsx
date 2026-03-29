@@ -90,6 +90,122 @@ function useLocalStorage(key,initial) {
   useEffect(()=>{try{localStorage.setItem(key,JSON.stringify(val));}catch{}},[key,val]);
   return [val,setVal];
 }
+
+// ── USAGE LIMITS ──
+const USAGE_LIMITS = {
+  demo:   { chat:3, execute:2, quiz:1, exercise_grade:0, generate_exercise:1, generate_quiz:1, snippets_save:0 },
+  free:   { chat:10, execute:5, quiz:2, exercise_grade:2, generate_exercise:3, generate_quiz:3, snippets_save:5 },
+  pro:    { chat:Infinity, execute:Infinity, quiz:Infinity, exercise_grade:Infinity, generate_exercise:Infinity, generate_quiz:Infinity, snippets_save:Infinity },
+};
+const LIMIT_LABELS = { chat:"AI Chat Messages", execute:"Code Executions", quiz:"Quiz Attempts", exercise_grade:"Exercise Grading", generate_exercise:"Exercise Generation", generate_quiz:"Quiz Generation", snippets_save:"Saved Snippets" };
+
+function useLimits(user) {
+  const isDemo = !user || user.id === 0;
+  const tier = isDemo ? "demo" : (user?.tier || "free");
+  const limits = USAGE_LIMITS[tier] || USAGE_LIMITS.free;
+  const storageKey = isDemo ? "lf_demo_usage" : "lf_free_usage";
+
+  const getUsage = () => {
+    if (typeof window === "undefined") return {};
+    try {
+      const raw = (isDemo ? sessionStorage : localStorage).getItem(storageKey);
+      if (!raw) return {};
+      const parsed = JSON.parse(raw);
+      // For free tier, reset if date changed
+      if (!isDemo && parsed._date) {
+        const today = new Date().toISOString().slice(0,10);
+        if (parsed._date !== today) return { _date: today };
+      }
+      return parsed;
+    } catch { return {}; }
+  };
+
+  const setUsage = (usage) => {
+    try {
+      if (!isDemo) usage._date = new Date().toISOString().slice(0,10);
+      (isDemo ? sessionStorage : localStorage).setItem(storageKey, JSON.stringify(usage));
+    } catch {}
+  };
+
+  const check = (action) => {
+    if (tier === "pro") return { allowed: true, remaining: Infinity };
+    const usage = getUsage();
+    const used = usage[action] || 0;
+    const max = limits[action] ?? Infinity;
+    return { allowed: used < max, remaining: Math.max(0, max - used), limit: max, used };
+  };
+
+  const consume = (action) => {
+    if (tier === "pro") return true;
+    const usage = getUsage();
+    const used = usage[action] || 0;
+    const max = limits[action] ?? Infinity;
+    if (used >= max) return false;
+    usage[action] = used + 1;
+    setUsage(usage);
+    return true;
+  };
+
+  return { check, consume, tier, isDemo, limits };
+}
+
+function UpgradeModal({ action, tierInfo, onClose, onSignup }) {
+  const isDemo = tierInfo.isDemo;
+  const lbl = LIMIT_LABELS[action] || action;
+  const limit = tierInfo.limits[action] ?? 0;
+  return (
+    <div style={{ position:"fixed", inset:0, zIndex:9999, display:"flex", alignItems:"center", justifyContent:"center", background:"rgba(0,0,0,0.6)", backdropFilter:"blur(6px)" }} onClick={onClose}>
+      <div onClick={e=>e.stopPropagation()} style={{ background:"#1E293B", border:"1px solid rgba(148,163,184,0.15)", borderRadius:20, padding:"32px 28px", maxWidth:420, width:"90%", textAlign:"center", animation:"fadein 0.2s" }}>
+        <div style={{ fontSize:40, marginBottom:16 }}>{ limit===0 ? "🔒" : "⚡" }</div>
+        <h3 style={{ fontSize:18, fontWeight:700, color:"#E2E8F0", marginBottom:8 }}>
+          { limit===0 ? `${lbl} Not Available` : `${lbl} Limit Reached` }
+        </h3>
+        <p style={{ fontSize:13, color:"#94A3B8", lineHeight:1.7, marginBottom:20 }}>
+          {isDemo
+            ? limit===0
+              ? `This feature is not available in demo mode. Sign up for free to unlock ${lbl.toLowerCase()}!`
+              : `You've used all ${limit} free demo ${lbl.toLowerCase()}. Sign up to get ${USAGE_LIMITS.free[action]} ${lbl.toLowerCase()} per day — it's free!`
+            : `You've used all ${limit} daily ${lbl.toLowerCase()}. Upgrade to Pro for unlimited access!`
+          }
+        </p>
+        {isDemo ? (
+          <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+            <div style={{ background:"rgba(59,130,246,0.08)", border:"1px solid rgba(59,130,246,0.2)", borderRadius:12, padding:"14px 16px", textAlign:"left" }}>
+              <p style={{ fontSize:11, fontWeight:700, color:"#3B82F6", marginBottom:8, textTransform:"uppercase", letterSpacing:"0.08em" }}>Free Account Includes</p>
+              <div style={{ display:"flex", flexDirection:"column", gap:5 }}>
+                {Object.entries(USAGE_LIMITS.free).filter(([k])=>k!=="snippets_save").map(([k,v])=>(
+                  <div key={k} style={{ fontSize:12, color:"#94A3B8", display:"flex", alignItems:"center", gap:6 }}>
+                    <span style={{ color:"#3B82F6" }}>✓</span> {v} {LIMIT_LABELS[k]||k}/day
+                  </div>
+                ))}
+              </div>
+            </div>
+            <button onClick={onSignup} style={{ width:"100%", padding:"12px", borderRadius:10, border:"none", background:"linear-gradient(135deg,#3B82F6,#6366F1)", color:"white", fontSize:14, fontWeight:700, cursor:"pointer" }}>Sign Up Free</button>
+            <button onClick={onClose} style={{ width:"100%", padding:"10px", borderRadius:10, background:"rgba(148,163,184,0.08)", border:"1px solid rgba(148,163,184,0.1)", color:"#CBD5E1", fontSize:13, fontWeight:500, cursor:"pointer" }}>Continue Browsing</button>
+          </div>
+        ) : (
+          <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+            <div style={{ background:"rgba(139,92,246,0.08)", border:"1px solid rgba(139,92,246,0.2)", borderRadius:12, padding:"14px 16px", textAlign:"left" }}>
+              <p style={{ fontSize:11, fontWeight:700, color:"#8B5CF6", marginBottom:8, textTransform:"uppercase", letterSpacing:"0.08em" }}>Pro — $12/month</p>
+              <div style={{ display:"flex", flexDirection:"column", gap:5 }}>
+                {["Unlimited AI chat","Unlimited code runs","Unlimited quizzes & exercises","All 8 curriculum modules","Priority support"].map((f,i)=>(
+                  <div key={i} style={{ fontSize:12, color:"#94A3B8", display:"flex", alignItems:"center", gap:6 }}>
+                    <span style={{ color:"#8B5CF6" }}>✓</span> {f}
+                  </div>
+                ))}
+              </div>
+            </div>
+            <button onClick={onClose} style={{ width:"100%", padding:"12px", borderRadius:10, border:"none", background:"linear-gradient(135deg,#8B5CF6,#6366F1)", color:"white", fontSize:14, fontWeight:700, cursor:"pointer" }}>Upgrade to Pro</button>
+            <button onClick={onClose} style={{ width:"100%", padding:"10px", borderRadius:10, background:"rgba(148,163,184,0.08)", border:"1px solid rgba(148,163,184,0.1)", color:"#CBD5E1", fontSize:13, fontWeight:500, cursor:"pointer" }}>Maybe Later</button>
+          </div>
+        )}
+        <p style={{ fontSize:11, color:"#475569", marginTop:14 }}>
+          {isDemo ? "No credit card required" : "Resets daily at midnight"}
+        </p>
+      </div>
+    </div>
+  );
+}
 function Badge({ label, style:s }) {
   return <span style={{ fontSize:10, fontWeight:700, padding:"2px 8px", borderRadius:99, color:s.color, background:s.bg, border:`1px solid ${s.border}` }}>{label}</span>;
 }
@@ -807,10 +923,12 @@ function Sidebar({ expanded, setExpanded, activePage, setActivePage, role, user,
 // ══════════════════════════════════════════════════════════════════════════════
 // STUDENT DASHBOARD
 // ══════════════════════════════════════════════════════════════════════════════
-function StudentDashboard({ user, snippetCode, clearSnippetCode }) {
+function StudentDashboard({ user, snippetCode, clearSnippetCode, onSignup }) {
   const isDemo = !user || user.id === 0;
   const token = typeof window !== "undefined" ? localStorage.getItem("lf_token") : null;
   const authHeaders = token ? { Authorization: `Bearer ${token}` } : {};
+  const limiter = useLimits(user);
+  const [upgradeModal, setUpgradeModal] = useState(null); // action string or null
   const [tab, setTab]           = useLocalStorage("lf_student_tab","chat");
   const [msgs, setMsgs]         = useState(isDemo ? INIT_MSGS : []);
   const [input, setInput]       = useState("");
@@ -854,6 +972,7 @@ function StudentDashboard({ user, snippetCode, clearSnippetCode }) {
 
   const send = () => {
     const t=input.trim(); if(!t) return;
+    if(!limiter.consume("chat")){ setUpgradeModal("chat"); return; }
     setMsgs(p=>[...p,{id:Date.now(),role:"user",text:t}]);
     setInput(""); setTyping(true);
     // Save user message to DB
@@ -898,6 +1017,7 @@ function StudentDashboard({ user, snippetCode, clearSnippetCode }) {
 
   const saveSnippet=async()=>{
     if(!snippetTitle.trim()||!code.trim()){setToast({message:"Title and code are required",type:"error"});return;}
+    if(!limiter.consume("snippets_save")){setUpgradeModal("snippets_save");return;}
     setSnippetSaving(true);
     try{
       const res=await fetch("/api/snippets",{method:"POST",headers:{"Content-Type":"application/json",...authHeaders},body:JSON.stringify({title:snippetTitle,description:snippetDesc,code,tags:snippetTags})});
@@ -949,6 +1069,7 @@ function StudentDashboard({ user, snippetCode, clearSnippetCode }) {
 
   const submitQuiz=async()=>{
     if(!activeQuiz||submittingQuiz)return;
+    if(!limiter.consume("quiz")){setUpgradeModal("quiz");return;}
     setSubmittingQuiz(true);
     try {
       const res=await fetch("/api/quizzes/submit",{method:"POST",headers:{"Content-Type":"application/json",...authHeaders},body:JSON.stringify({quiz_id:activeQuiz.quiz_id,answers:quizAnswers})});
@@ -963,6 +1084,7 @@ function StudentDashboard({ user, snippetCode, clearSnippetCode }) {
 
   const submitExercise=async()=>{
     if(!activeExercise||exSubmitting)return;
+    if(!limiter.consume("exercise_grade")){setUpgradeModal("exercise_grade");return;}
     setExSubmitting(true);
     try {
       const res=await fetch("/api/exercises/submit",{method:"POST",headers:{"Content-Type":"application/json",...authHeaders},body:JSON.stringify({exercise_id:activeExercise.id,code:exCode})});
@@ -987,6 +1109,7 @@ function StudentDashboard({ user, snippetCode, clearSnippetCode }) {
 
   const generateQuiz=async()=>{
     if(!genQuizTopic||genQuizLoading)return;
+    if(!limiter.consume("generate_quiz")){setUpgradeModal("generate_quiz");return;}
     setGenQuizLoading(true);
     const params=getAdaptiveQuizParams(genQuizTopic);
     try {
@@ -1029,6 +1152,19 @@ function StudentDashboard({ user, snippetCode, clearSnippetCode }) {
   return (
     <div style={{display:"flex",flexDirection:"column",height:"100%",overflow:"hidden"}}>
       {toast&&<Toast message={toast.message} type={toast.type} onClose={()=>setToast(null)}/>}
+      {upgradeModal&&<UpgradeModal action={upgradeModal} tierInfo={limiter} onClose={()=>setUpgradeModal(null)} onSignup={onSignup||(()=>{})}/>}
+      {/* Usage indicator bar */}
+      {limiter.tier!=="pro"&&(
+        <div style={{display:"flex",alignItems:"center",gap:12,padding:"6px 14px",background:limiter.isDemo?"rgba(251,191,36,0.06)":"rgba(59,130,246,0.06)",borderBottom:"1px solid "+(limiter.isDemo?"rgba(251,191,36,0.12)":"rgba(59,130,246,0.12)"),flexShrink:0,overflowX:"auto"}}>
+          <span style={{fontSize:10,fontWeight:700,color:limiter.isDemo?"#FBBF24":"#3B82F6",textTransform:"uppercase",letterSpacing:"0.08em",flexShrink:0}}>{limiter.isDemo?"Demo":"Free"}</span>
+          {["chat","execute","quiz"].map(a=>{const s=limiter.check(a);return(
+            <div key={a} style={{display:"flex",alignItems:"center",gap:4,flexShrink:0}}>
+              <span style={{fontSize:10,color:"#64748B"}}>{LIMIT_LABELS[a]?.split(" ")[0]}:</span>
+              <span style={{fontSize:10,fontWeight:600,color:s.remaining===0?"#FB7185":s.remaining<=1?"#FBBF24":"#94A3B8"}}>{s.remaining}/{s.limit}</span>
+            </div>
+          );})}
+        </div>
+      )}
       <div style={{display:"flex",alignItems:"center",background:"rgba(15,23,42,0.7)",borderBottom:"1px solid rgba(148,163,184,0.07)",flexShrink:0,padding:"0 4px",overflowX:"auto",WebkitOverflowScrolling:"touch"}}>
         {TABS.map(t=>{const active=tab===t.id;return <button key={t.id} onClick={()=>setTab(t.id)} style={{display:"flex",alignItems:"center",gap:6,padding:"0 12px",height:42,border:"none",borderBottom:active?"2px solid #3B82F6":"2px solid transparent",cursor:"pointer",fontSize:13,fontWeight:active?600:400,color:active?"#93C5FD":"#64748B",background:"transparent",transition:"all 0.15s",whiteSpace:"nowrap",flexShrink:0}}><span>{t.icon}</span>{t.label}</button>;})}
         <div style={{marginLeft:"auto",display:"flex",alignItems:"center",gap:5,padding:"0 12px",flexShrink:0}}>
@@ -1075,7 +1211,7 @@ function StudentDashboard({ user, snippetCode, clearSnippetCode }) {
             <textarea value={code} onChange={e=>setCode(e.target.value)} spellCheck={false} style={{flex:1,background:"transparent",border:"none",color:"#ABB2BF",fontFamily:"'Fira Code',monospace",fontSize:12,lineHeight:"22px",padding:"10px 12px 10px 0",resize:"none",outline:"none",tabSize:4,whiteSpace:"pre",overflowX:"auto"}} onKeyDown={e=>{if(e.key==="Tab"){e.preventDefault();const s=e.target.selectionStart;const end=e.target.selectionEnd;setCode(code.substring(0,s)+"    "+code.substring(end));setTimeout(()=>{e.target.selectionStart=e.target.selectionEnd=s+4;},0);}}}/>
           </div>
           <div style={{display:"flex",alignItems:"center",gap:8,padding:"9px 13px",borderTop:"1px solid rgba(148,163,184,0.07)",background:"rgba(15,23,42,0.7)",flexShrink:0}}>
-            <button onClick={()=>{setRunState("running");setOutput("");fetch("/api/execute",{method:"POST",headers:{"Content-Type":"application/json",...authHeaders},body:JSON.stringify({code})}).then(r=>{if(!r.ok)throw new Error("Execution service unavailable");return r.json();}).then(d=>{setRunState("done");setOutput(d.output||d.error||"(no output)");if(!isDemo)fetch("/api/submissions",{headers:authHeaders}).then(r=>r.ok?r.json():null).then(s=>{if(s&&s.stats)setExecStats(s.stats);}).catch(()=>{});if(!isDemo)fetch("/api/progress",{headers:authHeaders}).then(r=>r.ok?r.json():null).then(s=>{if(s)setTopics(s.topics);}).catch(()=>{});}).catch(e=>{setRunState("done");setOutput("Error: "+(e.message||"could not execute code"));setToast({message:"Code execution failed: "+(e.message||"unknown error"),type:"error"});});}} style={{display:"flex",alignItems:"center",gap:5,padding:"7px 13px",borderRadius:8,border:"none",background:runState==="running"?"rgba(16,185,129,0.12)":"linear-gradient(135deg,#059669,#10B981)",color:runState==="running"?"#34D399":"white",fontSize:13,fontWeight:600,cursor:"pointer",transition:"all 0.18s"}}>
+            <button onClick={()=>{if(!limiter.consume("execute")){setUpgradeModal("execute");return;}setRunState("running");setOutput("");fetch("/api/execute",{method:"POST",headers:{"Content-Type":"application/json",...authHeaders},body:JSON.stringify({code})}).then(r=>{if(!r.ok)throw new Error("Execution service unavailable");return r.json();}).then(d=>{setRunState("done");setOutput(d.output||d.error||"(no output)");if(!isDemo)fetch("/api/submissions",{headers:authHeaders}).then(r=>r.ok?r.json():null).then(s=>{if(s&&s.stats)setExecStats(s.stats);}).catch(()=>{});if(!isDemo)fetch("/api/progress",{headers:authHeaders}).then(r=>r.ok?r.json():null).then(s=>{if(s)setTopics(s.topics);}).catch(()=>{});}).catch(e=>{setRunState("done");setOutput("Error: "+(e.message||"could not execute code"));setToast({message:"Code execution failed: "+(e.message||"unknown error"),type:"error"});});}} style={{display:"flex",alignItems:"center",gap:5,padding:"7px 13px",borderRadius:8,border:"none",background:runState==="running"?"rgba(16,185,129,0.12)":"linear-gradient(135deg,#059669,#10B981)",color:runState==="running"?"#34D399":"white",fontSize:13,fontWeight:600,cursor:"pointer",transition:"all 0.18s"}}>
               <svg viewBox="0 0 24 24" fill="currentColor" style={{width:11,height:11}}><path fillRule="evenodd" d="M4.5 5.653c0-1.426 1.529-2.33 2.779-1.643l11.54 6.348c1.295.712 1.295 2.573 0 3.285L7.28 19.991c-1.25.687-2.779-.217-2.779-1.643V5.653z" clipRule="evenodd"/></svg>
               {runState==="running"?"Running…":"▶ Run"}
             </button>
@@ -1343,10 +1479,12 @@ function StudentDashboard({ user, snippetCode, clearSnippetCode }) {
 // ══════════════════════════════════════════════════════════════════════════════
 // TEACHER DASHBOARD
 // ══════════════════════════════════════════════════════════════════════════════
-function TeacherDashboard({ user }) {
+function TeacherDashboard({ user, onSignup }) {
   const isDemo = !user || user.id === 0;
   const token = typeof window !== "undefined" ? localStorage.getItem("lf_token") : null;
   const authHeaders = token ? { Authorization: `Bearer ${token}`, "Content-Type": "application/json" } : {};
+  const limiter = useLimits(user);
+  const [upgradeModal, setUpgradeModal] = useState(null);
   const [search,setSearch]=useState("");
   const [prompt,setPrompt]=useState("");
   const [generating,setGenerating]=useState(false);
@@ -1417,6 +1555,7 @@ function TeacherDashboard({ user }) {
 
   const generateExercise = async () => {
     if(!prompt.trim()||generating)return;
+    if(!limiter.consume("generate_exercise")){setUpgradeModal("generate_exercise");return;}
     setGenerating(true);
     if(isDemo){setTimeout(()=>{setGenerating(false);setGeneratedEx(GENERATED_EX);},1500);return;}
     try {
@@ -1454,6 +1593,19 @@ function TeacherDashboard({ user }) {
   return(
     <div style={{flex:1,overflowY:"auto",padding:"18px 14px"}}>
       {toast&&<Toast message={toast.message} type={toast.type} onClose={()=>setToast(null)}/>}
+      {upgradeModal&&<UpgradeModal action={upgradeModal} tierInfo={limiter} onClose={()=>setUpgradeModal(null)} onSignup={onSignup||(()=>{})}/>}
+      {/* Usage indicator for teacher */}
+      {limiter.tier!=="pro"&&(
+        <div style={{display:"flex",alignItems:"center",gap:12,padding:"8px 14px",marginBottom:12,background:limiter.isDemo?"rgba(251,191,36,0.06)":"rgba(16,185,129,0.06)",border:"1px solid "+(limiter.isDemo?"rgba(251,191,36,0.12)":"rgba(16,185,129,0.12)"),borderRadius:10,overflowX:"auto"}}>
+          <span style={{fontSize:10,fontWeight:700,color:limiter.isDemo?"#FBBF24":"#10B981",textTransform:"uppercase",letterSpacing:"0.08em",flexShrink:0}}>{limiter.isDemo?"Demo":"Free"}</span>
+          {["generate_exercise","generate_quiz"].map(a=>{const s=limiter.check(a);return(
+            <div key={a} style={{display:"flex",alignItems:"center",gap:4,flexShrink:0}}>
+              <span style={{fontSize:10,color:"#64748B"}}>{a==="generate_exercise"?"Exercises":"Quizzes"}:</span>
+              <span style={{fontSize:10,fontWeight:600,color:s.remaining===0?"#FB7185":s.remaining<=1?"#FBBF24":"#94A3B8"}}>{s.remaining}/{s.limit}</span>
+            </div>
+          );})}
+        </div>
+      )}
       {assignModal&&<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.6)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center",padding:20}} onClick={()=>setAssignModal(null)}>
         <div onClick={e=>e.stopPropagation()} style={{background:"#1E293B",border:"1px solid rgba(148,163,184,0.15)",borderRadius:16,padding:24,maxWidth:420,width:"100%"}}>
           <div style={{fontSize:15,fontWeight:700,color:"#F1F5F9",marginBottom:4}}>Assign Exercise</div>
@@ -1727,7 +1879,7 @@ function TeacherDashboard({ user }) {
                 <option value="intermediate">Intermediate</option>
                 <option value="advanced">Advanced</option>
               </select>
-              <button onClick={async()=>{if(!quizTopic||genQuiz)return;setGenQuiz(true);try{const r=await fetch("/api/quizzes/generate",{method:"POST",headers:authHeaders,body:JSON.stringify({topic:quizTopic,difficulty:quizDiff,num_questions:5})});const d=await r.json();if(d.quiz_id)setGenQuizResult(d);}catch{}setGenQuiz(false);}} style={{padding:"9px 16px",borderRadius:9,border:"none",background:quizTopic&&!genQuiz?"linear-gradient(135deg,#7C3AED,#8B5CF6)":"rgba(148,163,184,0.1)",color:quizTopic&&!genQuiz?"white":"#475569",fontSize:13,fontWeight:600,cursor:quizTopic?"pointer":"default",display:"flex",alignItems:"center",gap:7}}>
+              <button onClick={async()=>{if(!quizTopic||genQuiz)return;if(!limiter.consume("generate_quiz")){setUpgradeModal("generate_quiz");return;}setGenQuiz(true);try{const r=await fetch("/api/quizzes/generate",{method:"POST",headers:authHeaders,body:JSON.stringify({topic:quizTopic,difficulty:quizDiff,num_questions:5})});const d=await r.json();if(d.quiz_id)setGenQuizResult(d);}catch{}setGenQuiz(false);}} style={{padding:"9px 16px",borderRadius:9,border:"none",background:quizTopic&&!genQuiz?"linear-gradient(135deg,#7C3AED,#8B5CF6)":"rgba(148,163,184,0.1)",color:quizTopic&&!genQuiz?"white":"#475569",fontSize:13,fontWeight:600,cursor:quizTopic?"pointer":"default",display:"flex",alignItems:"center",gap:7}}>
                 {genQuiz?<><span style={{width:12,height:12,border:"2px solid #C4B5FD",borderTopColor:"transparent",borderRadius:"50%",display:"inline-block",animation:"spin 0.7s linear infinite"}}/>Creating…</>:"✦ Generate Quiz"}
               </button>
             </div>
@@ -3122,7 +3274,7 @@ function SettingsPage({ user, role, theme, setTheme }) {
 // ══════════════════════════════════════════════════════════════════════════════
 // APP SHELL
 // ══════════════════════════════════════════════════════════════════════════════
-function AppShell({ role, user, onLogout, theme, setTheme }) {
+function AppShell({ role, user, onLogout, onSignup, theme, setTheme }) {
   const [sidebarOpen, setSidebarOpen]       = useState(false);
   const [sidebarExpanded, setSidebarExpanded] = useState(true);
   const [activePage, setActivePage]         = useState("dashboard");
@@ -3161,8 +3313,8 @@ function AppShell({ role, user, onLogout, theme, setTheme }) {
           </div>
         </div>
         <div style={{flex:1,overflow:"hidden",display:"flex",flexDirection:"column"}}>
-          {activePage==="dashboard"&&role==="student"&&<StudentDashboard user={user} snippetCode={snippetCode} clearSnippetCode={()=>setSnippetCode(null)}/>}
-          {activePage==="dashboard"&&role==="teacher"&&<TeacherDashboard user={user}/>}
+          {activePage==="dashboard"&&role==="student"&&<StudentDashboard user={user} snippetCode={snippetCode} clearSnippetCode={()=>setSnippetCode(null)} onSignup={onSignup}/>}
+          {activePage==="dashboard"&&role==="teacher"&&<TeacherDashboard user={user} onSignup={onSignup}/>}
           {activePage==="learn"&&role==="student"&&<LearnPage user={user}/>}
           {activePage==="teachers"&&role==="student"&&<TeachersPage user={user}/>}
           {activePage==="snippets"&&role==="student"&&<SnippetsPage user={user} onLoadSnippet={(code)=>{setSnippetCode(code);setActivePage("dashboard");}}/>}
@@ -3598,6 +3750,7 @@ export default function App() {
           role={role}
           user={user}
           onLogout={handleLogout}
+          onSignup={()=>{handleLogout();setTimeout(()=>setScreen("login"),100);}}
           theme={theme}
           setTheme={setTheme}
         />
