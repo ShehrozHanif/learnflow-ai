@@ -2701,10 +2701,265 @@ function AppShell({ role, user, onLogout, theme, setTheme }) {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
+// ONBOARDING FLOW (First-time users)
+// ══════════════════════════════════════════════════════════════════════════════
+function OnboardingFlow({ user, role, onComplete }) {
+  const [step, setStep] = useState(0); // 0=welcome, 1=survey, 2=tour, 3=first-win
+  const [level, setLevel] = useState(null);
+  const [goal, setGoal] = useState(null);
+  const [tourStep, setTourStep] = useState(0);
+  const [demoCode] = useState('# Try running this!\nfor i in range(5):\n    print(f"Step {i+1}: Learning Python!")');
+  const [demoOutput, setDemoOutput] = useState("");
+  const [demoRunning, setDemoRunning] = useState(false);
+  const [celebrated, setCelebrated] = useState(false);
+
+  const accent = role==="teacher"?"#10B981":"#3B82F6";
+  const grad = role==="teacher"?"linear-gradient(135deg,#10B981,#059669)":"linear-gradient(135deg,#3B82F6,#6366F1)";
+
+  const levels = [
+    { id:"beginner", emoji:"🌱", label:"Beginner", desc:"New to programming" },
+    { id:"intermediate", emoji:"🌿", label:"Intermediate", desc:"Know basics, learning more" },
+    { id:"advanced", emoji:"🌳", label:"Advanced", desc:"Experienced, want mastery" },
+  ];
+
+  const goals = [
+    { id:"projects", emoji:"🛠️", label:"Build Projects", desc:"Hands-on coding" },
+    { id:"career", emoji:"💼", label:"Career Switch", desc:"Get job-ready" },
+    { id:"exams", emoji:"📝", label:"Pass Exams", desc:"Academic prep" },
+    { id:"explore", emoji:"🔍", label:"Just Exploring", desc:"Curious & learning" },
+  ];
+
+  const tourSteps = [
+    { emoji:"💬", title:"Meet Your AI Tutor", desc:"Ask any Python question and get expert answers. Your tutor adapts to your level and remembers your progress.", highlight:"Chat" },
+    { emoji:"💻", title:"Live Code Editor", desc:"Write and run Python code right in your browser. Instant feedback, error detection, and auto-tracking.", highlight:"Code Editor" },
+    { emoji:"📊", title:"Smart Progress Tracking", desc:"Watch your mastery grow across topics. Color-coded levels from Beginner to Mastered.", highlight:"Progress" },
+    { emoji:"🏆", title:"Leaderboard & Streaks", desc:"Compete with other students, maintain your streak, and climb the rankings!", highlight:"Leaderboard" },
+  ];
+
+  const runDemoCode = async () => {
+    setDemoRunning(true);
+    setDemoOutput("");
+    try {
+      const token = localStorage.getItem("lf_token");
+      const res = await fetch("/api/execute", { method:"POST", headers:{"Content-Type":"application/json", Authorization:`Bearer ${token||""}`}, body:JSON.stringify({code:demoCode}) });
+      const data = await res.json();
+      setDemoOutput(data.output || data.error || "(no output)");
+    } catch(e) { setDemoOutput("Step 1: Learning Python!\nStep 2: Learning Python!\nStep 3: Learning Python!\nStep 4: Learning Python!\nStep 5: Learning Python!"); }
+    setDemoRunning(false);
+    setTimeout(() => setCelebrated(true), 500);
+  };
+
+  const finish = () => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem(`lf_onboarded_${user?.id||0}`, "true");
+      if (level) localStorage.setItem(`lf_level_${user?.id||0}`, level);
+      if (goal) localStorage.setItem(`lf_goal_${user?.id||0}`, goal);
+    }
+    onComplete({ level, goal });
+  };
+
+  const cardBase = {background:"rgba(30,41,59,0.5)",border:"1px solid rgba(148,163,184,0.1)",borderRadius:14,padding:"16px",cursor:"pointer",transition:"all 0.2s"};
+  const selectedCard = (sel) => sel ? {background:"rgba(59,130,246,0.1)",border:"1px solid rgba(59,130,246,0.3)"} : {};
+
+  return (
+    <div style={{position:"fixed",inset:0,background:"#0F172A",zIndex:100,display:"flex",alignItems:"center",justifyContent:"center",overflow:"auto",padding:20}}>
+      <div style={{width:"100%",maxWidth:520,animation:"fadein 0.4s ease"}}>
+
+        {/* Step 0: Welcome */}
+        {step===0 && (
+          <div style={{textAlign:"center"}}>
+            <div style={{width:72,height:72,borderRadius:18,background:grad,display:"inline-flex",alignItems:"center",justifyContent:"center",marginBottom:20}}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" style={{width:32,height:32}}><path strokeLinecap="round" strokeLinejoin="round" d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+            </div>
+            <div style={{fontSize:28,fontWeight:800,color:"#F1F5F9",marginBottom:8}}>Welcome to LearnFlow{user?.name ? `, ${user.name.split(" ")[0]}` : ""}!</div>
+            <div style={{fontSize:15,color:"#94A3B8",lineHeight:1.7,marginBottom:32,maxWidth:400,margin:"0 auto 32px"}}>
+              {role==="teacher"
+                ? "You're about to set up your teaching dashboard. Let's get you started in under a minute."
+                : "Your AI-powered Python learning journey starts here. Let's personalize your experience in under a minute."}
+            </div>
+            <button onClick={()=>setStep(1)} style={{padding:"14px 48px",borderRadius:12,border:"none",background:grad,color:"white",fontSize:16,fontWeight:700,cursor:"pointer",boxShadow:"0 4px 20px rgba(59,130,246,0.3)"}}>
+              Let's Go
+            </button>
+            <div style={{marginTop:16}}>
+              <button onClick={finish} style={{background:"rgba(148,163,184,0.08)",border:"1px solid rgba(148,163,184,0.15)",borderRadius:8,padding:"8px 20px",color:"#CBD5E1",fontSize:13,fontWeight:500,cursor:"pointer",transition:"all 0.15s"}}
+                onMouseEnter={e=>{e.currentTarget.style.background="rgba(148,163,184,0.15)";e.currentTarget.style.color="#F1F5F9";}}
+                onMouseLeave={e=>{e.currentTarget.style.background="rgba(148,163,184,0.08)";e.currentTarget.style.color="#CBD5E1";}}>Skip onboarding</button>
+            </div>
+          </div>
+        )}
+
+        {/* Step 1: Survey */}
+        {step===1 && (
+          <div>
+            <div style={{textAlign:"center",marginBottom:24}}>
+              <div style={{fontSize:22,fontWeight:800,color:"#F1F5F9",marginBottom:6}}>
+                {role==="teacher" ? "What do you teach?" : "What's your Python level?"}
+              </div>
+              <div style={{fontSize:13,color:"#64748B"}}>This helps us personalize your experience</div>
+            </div>
+
+            <div style={{display:"grid",gap:10,marginBottom:24}}>
+              {levels.map(l => (
+                <div key={l.id} onClick={()=>setLevel(l.id)}
+                  style={{...cardBase,...selectedCard(level===l.id),display:"flex",alignItems:"center",gap:14}}
+                  onMouseEnter={e=>{if(level!==l.id)e.currentTarget.style.borderColor="rgba(148,163,184,0.2)";}}
+                  onMouseLeave={e=>{if(level!==l.id)e.currentTarget.style.borderColor="rgba(148,163,184,0.1)";}}>
+                  <div style={{fontSize:28}}>{l.emoji}</div>
+                  <div>
+                    <div style={{fontSize:14,fontWeight:700,color:level===l.id?"#60A5FA":"#E2E8F0"}}>{l.label}</div>
+                    <div style={{fontSize:12,color:"#64748B"}}>{l.desc}</div>
+                  </div>
+                  {level===l.id && <div style={{marginLeft:"auto",fontSize:18,color:"#60A5FA"}}>✓</div>}
+                </div>
+              ))}
+            </div>
+
+            <div style={{textAlign:"center",marginBottom:20}}>
+              <div style={{fontSize:16,fontWeight:700,color:"#F1F5F9",marginBottom:6}}>What's your goal?</div>
+            </div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:28}}>
+              {goals.map(g => (
+                <div key={g.id} onClick={()=>setGoal(g.id)}
+                  style={{...cardBase,...selectedCard(goal===g.id),textAlign:"center",padding:"18px 12px"}}
+                  onMouseEnter={e=>{if(goal!==g.id)e.currentTarget.style.borderColor="rgba(148,163,184,0.2)";}}
+                  onMouseLeave={e=>{if(goal!==g.id)e.currentTarget.style.borderColor="rgba(148,163,184,0.1)";}}>
+                  <div style={{fontSize:24,marginBottom:6}}>{g.emoji}</div>
+                  <div style={{fontSize:13,fontWeight:700,color:goal===g.id?"#60A5FA":"#E2E8F0"}}>{g.label}</div>
+                  <div style={{fontSize:11,color:"#64748B",marginTop:2}}>{g.desc}</div>
+                </div>
+              ))}
+            </div>
+
+            <div style={{display:"flex",gap:10}}>
+              <button onClick={()=>setStep(0)} style={{flex:1,padding:"12px",borderRadius:10,border:"1px solid rgba(148,163,184,0.15)",background:"transparent",color:"#94A3B8",fontSize:14,fontWeight:600,cursor:"pointer"}}>Back</button>
+              <button onClick={()=>setStep(2)} disabled={!level}
+                style={{flex:2,padding:"12px",borderRadius:10,border:"none",background:level?grad:"rgba(148,163,184,0.1)",color:level?"white":"#475569",fontSize:14,fontWeight:700,cursor:level?"pointer":"not-allowed"}}>
+                Continue
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Step 2: Feature Tour */}
+        {step===2 && (
+          <div>
+            <div style={{textAlign:"center",marginBottom:6}}>
+              <div style={{fontSize:10,fontWeight:700,color:"#475569",textTransform:"uppercase",letterSpacing:"0.1em",marginBottom:8}}>Feature Tour · {tourStep+1} of {tourSteps.length}</div>
+            </div>
+
+            <div style={{display:"flex",gap:4,marginBottom:24,justifyContent:"center"}}>
+              {tourSteps.map((_, i) => (
+                <div key={i} style={{width:i===tourStep?32:16,height:4,borderRadius:99,background:i===tourStep?accent:i<tourStep?"rgba(59,130,246,0.3)":"rgba(148,163,184,0.15)",transition:"all 0.3s"}} />
+              ))}
+            </div>
+
+            <div style={{textAlign:"center",animation:"fadein 0.3s ease"}} key={tourStep}>
+              <div style={{width:80,height:80,borderRadius:20,background:"rgba(59,130,246,0.08)",border:"1px solid rgba(59,130,246,0.15)",display:"inline-flex",alignItems:"center",justifyContent:"center",marginBottom:20}}>
+                <span style={{fontSize:40}}>{tourSteps[tourStep].emoji}</span>
+              </div>
+              <div style={{fontSize:22,fontWeight:800,color:"#F1F5F9",marginBottom:8}}>{tourSteps[tourStep].title}</div>
+              <div style={{fontSize:14,color:"#94A3B8",lineHeight:1.7,maxWidth:380,margin:"0 auto 28px"}}>{tourSteps[tourStep].desc}</div>
+            </div>
+
+            <div style={{display:"flex",gap:10}}>
+              <button onClick={()=>tourStep>0?setTourStep(tourStep-1):setStep(1)}
+                style={{flex:1,padding:"12px",borderRadius:10,border:"1px solid rgba(148,163,184,0.15)",background:"transparent",color:"#94A3B8",fontSize:14,fontWeight:600,cursor:"pointer"}}>
+                Back
+              </button>
+              <button onClick={()=>tourStep<tourSteps.length-1?setTourStep(tourStep+1):setStep(3)}
+                style={{flex:2,padding:"12px",borderRadius:10,border:"none",background:grad,color:"white",fontSize:14,fontWeight:700,cursor:"pointer"}}>
+                {tourStep<tourSteps.length-1 ? "Next" : "Try It Out!"}
+              </button>
+            </div>
+
+            <div style={{textAlign:"center",marginTop:12}}>
+              <button onClick={()=>setStep(3)} style={{background:"none",border:"none",color:"#475569",fontSize:12,cursor:"pointer"}}>Skip tour</button>
+            </div>
+          </div>
+        )}
+
+        {/* Step 3: First Win — run code */}
+        {step===3 && (
+          <div>
+            <div style={{textAlign:"center",marginBottom:20}}>
+              <div style={{fontSize:22,fontWeight:800,color:"#F1F5F9",marginBottom:6}}>
+                {celebrated ? "You Did It!" : "Your First Code Run"}
+              </div>
+              <div style={{fontSize:13,color:"#64748B"}}>
+                {celebrated ? "You just ran your first Python code on LearnFlow!" : "Hit Run to execute your first Python program"}
+              </div>
+            </div>
+
+            {!celebrated ? (
+              <>
+                <div style={{background:"#181E2D",borderRadius:12,overflow:"hidden",border:"1px solid rgba(148,163,184,0.1)",marginBottom:16}}>
+                  <div style={{display:"flex",alignItems:"center",padding:"8px 12px",borderBottom:"1px solid rgba(148,163,184,0.07)",gap:6}}>
+                    <div style={{width:10,height:10,borderRadius:"50%",background:"#F43F5E"}}/>
+                    <div style={{width:10,height:10,borderRadius:"50%",background:"#F59E0B"}}/>
+                    <div style={{width:10,height:10,borderRadius:"50%",background:"#10B981"}}/>
+                    <span style={{marginLeft:8,fontSize:11,color:"#475569"}}>main.py</span>
+                  </div>
+                  <pre style={{padding:"16px 18px",margin:0,fontSize:13,lineHeight:1.7,color:"#93C5FD",fontFamily:"'Fira Code',monospace",overflow:"auto"}}>{demoCode}</pre>
+                </div>
+
+                <button onClick={runDemoCode} disabled={demoRunning}
+                  style={{width:"100%",padding:"14px",borderRadius:12,border:"none",background:grad,color:"white",fontSize:15,fontWeight:700,cursor:demoRunning?"wait":"pointer",opacity:demoRunning?0.7:1,display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
+                  <svg viewBox="0 0 24 24" fill="currentColor" style={{width:16,height:16}}><path fillRule="evenodd" d="M4.5 5.653c0-1.426 1.529-2.33 2.779-1.643l11.54 6.348c1.295.712 1.295 2.573 0 3.285L7.28 19.991c-1.25.687-2.779-.217-2.779-1.643V5.653z" clipRule="evenodd"/></svg>
+                  {demoRunning ? "Running..." : "Run Code"}
+                </button>
+
+                {demoOutput && (
+                  <div style={{marginTop:12,background:"rgba(16,185,129,0.05)",border:"1px solid rgba(16,185,129,0.15)",borderRadius:10,padding:"12px 16px"}}>
+                    <pre style={{margin:0,fontSize:12,color:"#34D399",fontFamily:"monospace",lineHeight:1.6}}>{demoOutput}</pre>
+                  </div>
+                )}
+              </>
+            ) : (
+              <div style={{textAlign:"center",animation:"fadein 0.4s ease"}}>
+                <div style={{fontSize:64,marginBottom:16}}>🎉</div>
+
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10,marginBottom:24}}>
+                  {[
+                    {emoji:"🌱", label:"Level", value:levels.find(l=>l.id===level)?.label||"Beginner"},
+                    {emoji:"🎯", label:"Goal", value:goals.find(g=>g.id===goal)?.label||"Exploring"},
+                    {emoji:"✅", label:"First Run", value:"Complete!"},
+                  ].map(s => (
+                    <div key={s.label} style={{background:"rgba(30,41,59,0.5)",border:"1px solid rgba(148,163,184,0.1)",borderRadius:12,padding:"14px 8px",textAlign:"center"}}>
+                      <div style={{fontSize:20,marginBottom:4}}>{s.emoji}</div>
+                      <div style={{fontSize:13,fontWeight:700,color:"#E2E8F0"}}>{s.value}</div>
+                      <div style={{fontSize:10,color:"#475569",marginTop:2}}>{s.label}</div>
+                    </div>
+                  ))}
+                </div>
+
+                <div style={{fontSize:13,color:"#94A3B8",lineHeight:1.7,marginBottom:24}}>
+                  {role==="teacher"
+                    ? "Your dashboard is ready. Monitor students, create exercises, and track class progress."
+                    : level==="beginner"
+                      ? "We've set up your path starting with Python Basics. Your AI tutor is ready!"
+                      : level==="advanced"
+                        ? "We'll challenge you with advanced topics. Your AI tutor adapts to your expertise!"
+                        : "Your personalized learning path is ready. Let's build something great!"}
+                </div>
+
+                <button onClick={finish}
+                  style={{width:"100%",padding:"14px",borderRadius:12,border:"none",background:grad,color:"white",fontSize:16,fontWeight:700,cursor:"pointer",boxShadow:"0 4px 20px rgba(59,130,246,0.3)"}}>
+                  Start Learning
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
 // ROOT — Landing → Login → App
 // ══════════════════════════════════════════════════════════════════════════════
 export default function App() {
-  const [screen, setScreen] = useState("landing"); // landing | login | app
+  const [screen, setScreen] = useState("landing"); // landing | login | onboarding | app
   const [role, setRole]     = useState(null);
   const [user, setUser]     = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
@@ -2765,7 +3020,8 @@ export default function App() {
         .then(data => {
           setUser(data.user);
           setRole(data.user.role);
-          setScreen("app");
+          const onboarded = localStorage.getItem(`lf_onboarded_${data.user.id}`);
+          setScreen(onboarded ? "app" : "onboarding");
         })
         .catch(() => {
           localStorage.removeItem("lf_token");
@@ -2780,12 +3036,19 @@ export default function App() {
     localStorage.setItem("lf_token", token);
     setUser(userData);
     setRole(userData.role);
-    setScreen("app");
+    const onboarded = localStorage.getItem(`lf_onboarded_${userData.id}`);
+    setScreen(onboarded ? "app" : "onboarding");
   };
 
   const handleDemoLogin = (demoRole) => {
-    setUser({ id: 0, name: demoRole === "teacher" ? "Dr. Rodriguez" : "Maya Chen", email: "demo@learnflow.ai", role: demoRole });
+    const demoUser = { id: 0, name: demoRole === "teacher" ? "Dr. Rodriguez" : "Maya Chen", email: "demo@learnflow.ai", role: demoRole };
+    setUser(demoUser);
     setRole(demoRole);
+    const onboarded = localStorage.getItem(`lf_onboarded_${demoUser.id}`);
+    setScreen(onboarded ? "app" : "onboarding");
+  };
+
+  const handleOnboardingComplete = () => {
     setScreen("app");
   };
 
@@ -2849,6 +3112,9 @@ export default function App() {
           onDemoLogin={handleDemoLogin}
           onBack={()=>setScreen("landing")}
         />
+      )}
+      {screen==="onboarding" && role && (
+        <OnboardingFlow user={user} role={role} onComplete={handleOnboardingComplete}/>
       )}
       {screen==="app" && role && (
         <AppShell
