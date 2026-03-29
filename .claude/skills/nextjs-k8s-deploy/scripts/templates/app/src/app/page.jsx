@@ -635,6 +635,7 @@ function LoginPage({ onLogin, onDemoLogin, onBack }) {
 const NAV_ITEMS = [
   { id:"dashboard",    label:"Dashboard",    emoji:"⊞" },
   { id:"learn",        label:"Learn",        emoji:"📚", studentOnly:true },
+  { id:"snippets",     label:"Snippets",     emoji:"📌", studentOnly:true },
   { id:"history",      label:"Chat History", emoji:"🗂️", studentOnly:true },
   { id:"teachers",     label:"Teachers",     emoji:"👨‍🏫", studentOnly:true },
   { id:"leaderboard",  label:"Leaderboard",  emoji:"🏆" },
@@ -701,7 +702,7 @@ function Sidebar({ expanded, setExpanded, activePage, setActivePage, role, user,
 // ══════════════════════════════════════════════════════════════════════════════
 // STUDENT DASHBOARD
 // ══════════════════════════════════════════════════════════════════════════════
-function StudentDashboard({ user }) {
+function StudentDashboard({ user, snippetCode, clearSnippetCode }) {
   const isDemo = !user || user.id === 0;
   const token = typeof window !== "undefined" ? localStorage.getItem("lf_token") : null;
   const authHeaders = token ? { Authorization: `Bearer ${token}` } : {};
@@ -719,6 +720,11 @@ function StudentDashboard({ user }) {
   const [expandedTopic, setExpandedTopic] = useState(null);
   const chatEnd = useRef(null);
   useEffect(()=>{ chatEnd.current?.scrollIntoView({behavior:"smooth"}); },[msgs,typing]);
+
+  // Handle snippet loaded from SnippetsPage
+  useEffect(()=>{
+    if(snippetCode){setCode(snippetCode);setTab("code");clearSnippetCode();}
+  },[snippetCode]);
 
   // Load real data on mount
   useEffect(()=>{
@@ -779,6 +785,23 @@ function StudentDashboard({ user }) {
   const [exResult,setExResult]=useState(null);
   const [genQuizTopic,setGenQuizTopic]=useState("");
   const [genQuizLoading,setGenQuizLoading]=useState(false);
+  const [snippetModal,setSnippetModal]=useState(false);
+  const [snippetTitle,setSnippetTitle]=useState("");
+  const [snippetDesc,setSnippetDesc]=useState("");
+  const [snippetTags,setSnippetTags]=useState("");
+  const [snippetSaving,setSnippetSaving]=useState(false);
+
+  const saveSnippet=async()=>{
+    if(!snippetTitle.trim()||!code.trim()){setToast({message:"Title and code are required",type:"error"});return;}
+    setSnippetSaving(true);
+    try{
+      const res=await fetch("/api/snippets",{method:"POST",headers:{"Content-Type":"application/json",...authHeaders},body:JSON.stringify({title:snippetTitle,description:snippetDesc,code,tags:snippetTags})});
+      if(!res.ok)throw new Error("Failed to save");
+      setToast({message:`Snippet "${snippetTitle}" saved!`,type:"success"});
+      setSnippetModal(false);setSnippetTitle("");setSnippetDesc("");setSnippetTags("");
+    }catch(e){setToast({message:e.message||"Save failed",type:"error"});}
+    setSnippetSaving(false);
+  };
 
   // Load assignments + quizzes
   useEffect(()=>{
@@ -916,12 +939,49 @@ function StudentDashboard({ user }) {
               {runState==="running"?"Running…":"▶ Run"}
             </button>
             <button onClick={()=>{setOutput("");setRunState("ready");}} style={{padding:"7px 11px",borderRadius:8,background:"rgba(30,41,59,0.8)",border:"1px solid rgba(148,163,184,0.1)",color:"#94A3B8",fontSize:13,cursor:"pointer"}}>Clear</button>
+            <button onClick={()=>setSnippetModal(true)} style={{padding:"7px 11px",borderRadius:8,background:"rgba(139,92,246,0.1)",border:"1px solid rgba(139,92,246,0.2)",color:"#A78BFA",fontSize:12,fontWeight:600,cursor:"pointer",display:"flex",alignItems:"center",gap:4}}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{width:11,height:11}}><path strokeLinecap="round" strokeLinejoin="round" d="M17.593 3.322c1.1.128 1.907 1.077 1.907 2.185V21L12 17.25 4.5 21V5.507c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0111.186 0z"/></svg>
+              Save
+            </button>
             <span style={{marginLeft:"auto",fontSize:11,color:runState==="ready"?"#334155":runState==="running"?"#F59E0B":"#34D399"}}>{runState==="ready"?"● Ready":runState==="running"?"● Running...":"● Done"}</span>
           </div>
           <div style={{height:120,background:"#0D1117",borderTop:"1px solid rgba(148,163,184,0.07)",flexShrink:0,padding:"10px 13px",overflowY:"auto"}}>
             {!output&&runState==="ready"&&<span style={{fontFamily:"monospace",fontSize:12,color:"#3E4451"}}>$ _</span>}
             {runState==="running"&&<span style={{fontFamily:"monospace",fontSize:12,color:"#F59E0B"}}>Running…</span>}
             {output&&<pre style={{fontFamily:"monospace",fontSize:13,lineHeight:1.7,color:"#E2E8F0",whiteSpace:"pre-wrap"}}><span style={{color:"#475569"}}>{"$ python main.py\n"}</span>{output}{"\n"}{output.startsWith("Error")||output.includes("Traceback")?<span style={{color:"#FB7185"}}>✗ Error</span>:<span style={{color:"#34D399"}}>✓ Success</span>}</pre>}
+          </div>
+        </div>
+      )}
+      {/* Save Snippet Modal */}
+      {snippetModal&&(
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.6)",zIndex:50,display:"flex",alignItems:"center",justifyContent:"center",padding:20,backdropFilter:"blur(2px)"}} onClick={()=>setSnippetModal(false)}>
+          <div onClick={e=>e.stopPropagation()} style={{background:"#1E293B",border:"1px solid rgba(148,163,184,0.15)",borderRadius:16,padding:"24px",width:"100%",maxWidth:420,animation:"fadein 0.2s ease"}}>
+            <div style={{fontSize:16,fontWeight:700,color:"#F1F5F9",marginBottom:4}}>Save Code Snippet</div>
+            <div style={{fontSize:12,color:"#64748B",marginBottom:18}}>Save this code to your snippets library for quick reuse</div>
+            <div style={{display:"grid",gap:12}}>
+              <div>
+                <label style={{fontSize:11,fontWeight:600,color:"#94A3B8",marginBottom:4,display:"block"}}>Title *</label>
+                <input value={snippetTitle} onChange={e=>setSnippetTitle(e.target.value)} placeholder="e.g. My Fibonacci Function" style={{width:"100%",padding:"10px 12px",background:"rgba(15,23,42,0.5)",border:"1px solid rgba(148,163,184,0.12)",borderRadius:8,fontSize:12,color:"#E2E8F0",outline:"none"}}/>
+              </div>
+              <div>
+                <label style={{fontSize:11,fontWeight:600,color:"#94A3B8",marginBottom:4,display:"block"}}>Description</label>
+                <input value={snippetDesc} onChange={e=>setSnippetDesc(e.target.value)} placeholder="Brief description of what this code does" style={{width:"100%",padding:"10px 12px",background:"rgba(15,23,42,0.5)",border:"1px solid rgba(148,163,184,0.12)",borderRadius:8,fontSize:12,color:"#E2E8F0",outline:"none"}}/>
+              </div>
+              <div>
+                <label style={{fontSize:11,fontWeight:600,color:"#94A3B8",marginBottom:4,display:"block"}}>Tags (comma-separated)</label>
+                <input value={snippetTags} onChange={e=>setSnippetTags(e.target.value)} placeholder="e.g. functions, recursion, math" style={{width:"100%",padding:"10px 12px",background:"rgba(15,23,42,0.5)",border:"1px solid rgba(148,163,184,0.12)",borderRadius:8,fontSize:12,color:"#E2E8F0",outline:"none"}}/>
+              </div>
+              <div>
+                <label style={{fontSize:11,fontWeight:600,color:"#94A3B8",marginBottom:4,display:"block"}}>Code Preview</label>
+                <pre style={{padding:"10px 12px",background:"rgba(15,23,42,0.7)",border:"1px solid rgba(148,163,184,0.08)",borderRadius:8,fontSize:11,color:"#93C5FD",fontFamily:"monospace",maxHeight:100,overflow:"auto",lineHeight:1.5}}>{code.length>500?code.slice(0,500)+"...":code}</pre>
+              </div>
+            </div>
+            <div style={{display:"flex",gap:10,marginTop:18}}>
+              <button onClick={()=>setSnippetModal(false)} style={{flex:1,padding:"10px",borderRadius:8,border:"1px solid rgba(148,163,184,0.15)",background:"transparent",color:"#94A3B8",fontSize:13,fontWeight:600,cursor:"pointer"}}>Cancel</button>
+              <button onClick={saveSnippet} disabled={snippetSaving||!snippetTitle.trim()} style={{flex:2,padding:"10px",borderRadius:8,border:"none",background:snippetTitle.trim()?"linear-gradient(135deg,#7C3AED,#8B5CF6)":"rgba(148,163,184,0.1)",color:snippetTitle.trim()?"white":"#475569",fontSize:13,fontWeight:700,cursor:snippetTitle.trim()?"pointer":"not-allowed",opacity:snippetSaving?0.6:1}}>
+                {snippetSaving?"Saving...":"Save Snippet"}
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -2397,6 +2457,143 @@ function LearnPage({ user }) {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
+// SNIPPETS PAGE (Sidebar)
+// ══════════════════════════════════════════════════════════════════════════════
+function SnippetsPage({ user, onLoadSnippet }) {
+  const [snippets, setSnippets] = useState([]);
+  const [starters, setStarters] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
+  const [tab, setTab] = useState("mine"); // mine | starters
+  const [toast, setToast] = useState(null);
+  const [expanded, setExpanded] = useState(null);
+  const authHeaders = { Authorization: `Bearer ${typeof window!=="undefined"?localStorage.getItem("lf_token")||"":""}` };
+
+  const load = () => {
+    fetch("/api/snippets", { headers: authHeaders })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d) { setSnippets(d.snippets||[]); setStarters(d.starters||[]); }})
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  };
+  useEffect(() => { load(); }, []);
+
+  const toggleStar = async (id) => {
+    await fetch("/api/snippets", { method:"PATCH", headers:{"Content-Type":"application/json",...authHeaders}, body:JSON.stringify({id}) });
+    setSnippets(prev => prev.map(s => s.id===id ? {...s, starred:!s.starred} : s));
+  };
+
+  const deleteSnippet = async (id) => {
+    await fetch("/api/snippets", { method:"DELETE", headers:{"Content-Type":"application/json",...authHeaders}, body:JSON.stringify({id}) });
+    setSnippets(prev => prev.filter(s => s.id!==id));
+    setToast({message:"Snippet deleted",type:"info"});
+  };
+
+  const copyCode = (code) => {
+    navigator.clipboard.writeText(code).then(()=>setToast({message:"Copied to clipboard!",type:"success"})).catch(()=>setToast({message:"Copy failed",type:"error"}));
+  };
+
+  const items = tab==="mine" ? snippets : starters;
+  const filtered = search.trim()
+    ? items.filter(s => s.title.toLowerCase().includes(search.toLowerCase()) || (s.tags||"").toLowerCase().includes(search.toLowerCase()) || (s.description||"").toLowerCase().includes(search.toLowerCase()))
+    : items;
+
+  return (
+    <div style={{flex:1,overflowY:"auto",padding:"20px 14px"}}>
+      {toast&&<Toast message={toast.message} type={toast.type} onClose={()=>setToast(null)}/>}
+      <div style={{maxWidth:640,margin:"0 auto"}}>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16}}>
+          <div>
+            <div style={{fontSize:20,fontWeight:800,color:"#F1F5F9"}}>Code Snippets</div>
+            <div style={{fontSize:12,color:"#64748B",marginTop:2}}>{snippets.length} saved · {starters.length} starter templates</div>
+          </div>
+        </div>
+
+        {/* Tabs */}
+        <div style={{display:"flex",gap:0,marginBottom:16,background:"rgba(30,41,59,0.6)",borderRadius:10,border:"1px solid rgba(148,163,184,0.08)",overflow:"hidden"}}>
+          {[{id:"mine",label:`My Snippets (${snippets.length})`},{id:"starters",label:`Starter Templates (${starters.length})`}].map(t=>(
+            <button key={t.id} onClick={()=>setTab(t.id)} style={{flex:1,padding:"9px 14px",border:"none",background:tab===t.id?"rgba(139,92,246,0.12)":"transparent",color:tab===t.id?"#A78BFA":"#64748B",fontSize:12,fontWeight:tab===t.id?700:500,cursor:"pointer",transition:"all 0.15s"}}>{t.label}</button>
+          ))}
+        </div>
+
+        {/* Search */}
+        <div style={{position:"relative",marginBottom:16}}>
+          <svg viewBox="0 0 24 24" fill="none" stroke="#475569" strokeWidth="2" style={{width:14,height:14,position:"absolute",left:12,top:"50%",transform:"translateY(-50%)"}}><path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z"/></svg>
+          <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search by title, tags, description..."
+            style={{width:"100%",padding:"10px 12px 10px 34px",background:"rgba(30,41,59,0.5)",border:"1px solid rgba(148,163,184,0.1)",borderRadius:10,fontSize:13,color:"#E2E8F0",outline:"none",fontFamily:"inherit"}}/>
+          {search && <button onClick={()=>setSearch("")} style={{position:"absolute",right:10,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",color:"#64748B",cursor:"pointer",fontSize:14}}>x</button>}
+        </div>
+
+        {loading ? <LoadingSpinner /> : filtered.length === 0 ? (
+          <div style={{textAlign:"center",padding:"48px 20px",color:"#475569"}}>
+            <div style={{fontSize:32,marginBottom:8}}>{search?"🔍":"📌"}</div>
+            <div style={{fontSize:14,fontWeight:600,color:"#64748B",marginBottom:4}}>{search?"No snippets match your search":tab==="mine"?"No saved snippets yet":"No starter templates"}</div>
+            <div style={{fontSize:12,color:"#475569"}}>{tab==="mine"?"Save code from the editor using the Save button":"Check back later for templates"}</div>
+          </div>
+        ) : (
+          <div style={{display:"flex",flexDirection:"column",gap:8}}>
+            {filtered.map(s => {
+              const isExp = expanded === (s.id);
+              const tags = (s.tags||"").split(",").map(t=>t.trim()).filter(Boolean);
+              return (
+                <div key={s.id} style={{background:"rgba(30,41,59,0.4)",border:`1px solid ${isExp?"rgba(139,92,246,0.2)":"rgba(148,163,184,0.07)"}`,borderRadius:12,overflow:"hidden",transition:"border-color 0.2s"}}>
+                  <div onClick={()=>setExpanded(isExp?null:s.id)} style={{display:"flex",alignItems:"center",gap:10,padding:"12px 14px",cursor:"pointer"}}
+                    onMouseEnter={e=>{e.currentTarget.style.background="rgba(148,163,184,0.03)";}}
+                    onMouseLeave={e=>{e.currentTarget.style.background="transparent";}}>
+                    {tab==="mine"&&!s.is_starter&&(
+                      <button onClick={e=>{e.stopPropagation();toggleStar(s.id);}} style={{background:"none",border:"none",cursor:"pointer",fontSize:16,padding:0,flexShrink:0}}>
+                        {s.starred?"⭐":"☆"}
+                      </button>
+                    )}
+                    {s.is_starter&&<span style={{fontSize:16,flexShrink:0}}>📦</span>}
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{display:"flex",alignItems:"center",gap:6}}>
+                        <span style={{fontSize:13,fontWeight:600,color:"#E2E8F0"}}>{s.title}</span>
+                        {s.starred&&<span style={{fontSize:9,fontWeight:700,padding:"1px 5px",borderRadius:99,color:"#F59E0B",background:"rgba(245,158,11,0.1)"}}>STARRED</span>}
+                      </div>
+                      {s.description&&<div style={{fontSize:11,color:"#64748B",marginTop:2}}>{s.description}</div>}
+                      {tags.length>0&&(
+                        <div style={{display:"flex",gap:4,marginTop:4,flexWrap:"wrap"}}>
+                          {tags.map(t=><span key={t} style={{fontSize:9,padding:"1px 6px",borderRadius:99,background:"rgba(139,92,246,0.08)",border:"1px solid rgba(139,92,246,0.15)",color:"#A78BFA",fontWeight:600}}>{t}</span>)}
+                        </div>
+                      )}
+                    </div>
+                    <span style={{fontSize:11,color:"#475569",transition:"transform 0.2s",transform:isExp?"rotate(180deg)":"rotate(0)",flexShrink:0}}>▼</span>
+                  </div>
+                  {isExp && (
+                    <div style={{borderTop:"1px solid rgba(148,163,184,0.05)",padding:"12px 14px"}}>
+                      <pre style={{padding:"12px 14px",background:"rgba(15,23,42,0.7)",border:"1px solid rgba(148,163,184,0.08)",borderRadius:8,fontSize:12,color:"#93C5FD",fontFamily:"'Fira Code',monospace",overflow:"auto",lineHeight:1.6,maxHeight:200,marginBottom:10}}>{s.code}</pre>
+                      <div style={{display:"flex",gap:8}}>
+                        <button onClick={()=>{onLoadSnippet(s.code);setToast({message:`"${s.title}" loaded into editor`,type:"success"});}}
+                          style={{flex:1,padding:"8px",borderRadius:8,border:"none",background:"linear-gradient(135deg,#7C3AED,#8B5CF6)",color:"white",fontSize:12,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:5}}>
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{width:12,height:12}}><path strokeLinecap="round" strokeLinejoin="round" d="M17.25 8.25L21 12m0 0l-3.75 3.75M21 12H3"/></svg>
+                          Load in Editor
+                        </button>
+                        <button onClick={()=>copyCode(s.code)}
+                          style={{padding:"8px 14px",borderRadius:8,border:"1px solid rgba(148,163,184,0.15)",background:"transparent",color:"#94A3B8",fontSize:12,fontWeight:600,cursor:"pointer",display:"flex",alignItems:"center",gap:4}}>
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{width:12,height:12}}><path strokeLinecap="round" strokeLinejoin="round" d="M15.666 3.888A2.25 2.25 0 0013.5 2.25h-3c-1.03 0-1.9.693-2.166 1.638m7.332 0c.055.194.084.4.084.612v0a.75.75 0 01-.75.75H9.75a.75.75 0 01-.75-.75v0c0-.212.03-.418.084-.612m7.332 0c.646.049 1.288.11 1.927.184 1.1.128 1.907 1.077 1.907 2.185V19.5a2.25 2.25 0 01-2.25 2.25H6.75A2.25 2.25 0 014.5 19.5V6.257c0-1.108.806-2.057 1.907-2.185a48.208 48.208 0 011.927-.184"/></svg>
+                          Copy
+                        </button>
+                        {tab==="mine"&&!s.is_starter&&(
+                          <button onClick={()=>deleteSnippet(s.id)}
+                            style={{padding:"8px 14px",borderRadius:8,border:"1px solid rgba(244,63,94,0.15)",background:"rgba(244,63,94,0.06)",color:"#FB7185",fontSize:12,fontWeight:600,cursor:"pointer"}}>
+                            Delete
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
 // CHAT HISTORY PAGE (Sidebar)
 // ══════════════════════════════════════════════════════════════════════════════
 function ChatHistoryPage({ user }) {
@@ -2789,6 +2986,7 @@ function AppShell({ role, user, onLogout, theme, setTheme }) {
   const [sidebarExpanded, setSidebarExpanded] = useState(true);
   const [activePage, setActivePage]         = useState("dashboard");
   const [isMobile, setIsMobile]             = useState(typeof window!=="undefined"?window.innerWidth<768:false);
+  const [snippetCode, setSnippetCode]       = useState(null);
   const accent = role==="teacher"?"#10B981":"#3B82F6";
   const grad   = role==="teacher"?"linear-gradient(135deg,#10B981,#059669)":"linear-gradient(135deg,#3B82F6,#6366F1)";
 
@@ -2822,10 +3020,11 @@ function AppShell({ role, user, onLogout, theme, setTheme }) {
           </div>
         </div>
         <div style={{flex:1,overflow:"hidden",display:"flex",flexDirection:"column"}}>
-          {activePage==="dashboard"&&role==="student"&&<StudentDashboard user={user}/>}
+          {activePage==="dashboard"&&role==="student"&&<StudentDashboard user={user} snippetCode={snippetCode} clearSnippetCode={()=>setSnippetCode(null)}/>}
           {activePage==="dashboard"&&role==="teacher"&&<TeacherDashboard user={user}/>}
           {activePage==="learn"&&role==="student"&&<LearnPage user={user}/>}
           {activePage==="teachers"&&role==="student"&&<TeachersPage user={user}/>}
+          {activePage==="snippets"&&role==="student"&&<SnippetsPage user={user} onLoadSnippet={(code)=>{setSnippetCode(code);setActivePage("dashboard");}}/>}
           {activePage==="history"&&role==="student"&&<ChatHistoryPage user={user}/>}
           {activePage==="leaderboard"&&<LeaderboardPage user={user}/>}
           {activePage==="progress"&&<ProgressPage user={user} role={role}/>}
