@@ -1786,71 +1786,75 @@ function TeacherDashboard({ user, onSignup }) {
           </>)}
         </div>
       </div>}
-      {(studentDetail||detailLoading)&&<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.7)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center",padding:20}} onClick={()=>{setStudentDetail(null);setDetailLoading(false);}}>
-        <div onClick={e=>e.stopPropagation()} style={{background:"#1E293B",border:"1px solid rgba(148,163,184,0.15)",borderRadius:16,padding:0,maxWidth:600,width:"100%",maxHeight:"85vh",overflowY:"auto"}}>
+      {(studentDetail||detailLoading)&&<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.7)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center",padding:8}} onClick={()=>{setStudentDetail(null);setDetailLoading(false);}}>
+        <div onClick={e=>e.stopPropagation()} style={{background:"#1E293B",border:"1px solid rgba(148,163,184,0.15)",borderRadius:16,padding:0,maxWidth:600,width:"100%",maxHeight:"90vh",overflowY:"auto"}}>
           {detailLoading&&!studentDetail?<div style={{padding:40,textAlign:"center"}}><LoadingSpinner size={28} color="#3B82F6"/><div style={{fontSize:12,color:"#64748B",marginTop:8}}>Loading student profile...</div></div>
           :studentDetail&&(<>
-            <div style={{padding:"20px 24px",borderBottom:"1px solid rgba(148,163,184,0.1)",display:"flex",alignItems:"center",gap:12}}>
-              <Avatar initials={studentDetail.student.name.split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase()} color="#3B82F6" size={42}/>
-              <div style={{flex:1}}>
-                <div style={{fontSize:16,fontWeight:700,color:"#F1F5F9"}}>{studentDetail.student.name}</div>
-                <div style={{fontSize:11,color:"#64748B"}}>{studentDetail.student.email} — Joined {new Date(studentDetail.student.joined).toLocaleDateString()}</div>
+            <div style={{padding:"14px 14px",borderBottom:"1px solid rgba(148,163,184,0.1)",display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
+              <Avatar initials={studentDetail.student.name.split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase()} color="#3B82F6" size={36}/>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontSize:15,fontWeight:700,color:"#F1F5F9",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{studentDetail.student.name}</div>
+                <div style={{fontSize:10,color:"#64748B",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{studentDetail.student.email}</div>
               </div>
-              {studentDetail.stuck_topics.length>0&&<span style={{fontSize:10,fontWeight:700,padding:"3px 8px",borderRadius:99,background:"rgba(244,63,94,0.12)",color:"#FB7185",border:"1px solid rgba(244,63,94,0.25)"}}>Struggling</span>}
-              <button onClick={()=>{setStudentDetail(null);setDetailLoading(false);}} style={{padding:"4px 8px",borderRadius:6,border:"1px solid rgba(148,163,184,0.15)",background:"transparent",color:"#64748B",fontSize:14,cursor:"pointer"}}>✕</button>
+              <div style={{display:"flex",alignItems:"center",gap:6,flexShrink:0}}>
+                {studentDetail.stuck_topics.length>0&&<span style={{fontSize:9,fontWeight:700,padding:"2px 7px",borderRadius:99,background:"rgba(244,63,94,0.12)",color:"#FB7185",border:"1px solid rgba(244,63,94,0.25)"}}>Struggling</span>}
+                <button onClick={()=>{setStudentDetail(null);setDetailLoading(false);}} style={{padding:"4px 8px",borderRadius:6,border:"1px solid rgba(148,163,184,0.15)",background:"transparent",color:"#64748B",fontSize:14,cursor:"pointer"}}>✕</button>
+              </div>
             </div>
-            <div style={{padding:"16px 24px"}}>
-              <div style={{display:"flex",gap:10,marginBottom:16,flexWrap:"wrap"}}>
+            <div style={{padding:"12px 14px"}}>
+              <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:8,marginBottom:14}}>
                 {[
                   {l:"Avg Mastery",v:studentDetail.progress.length?Math.round(studentDetail.progress.reduce((a,p)=>a+p.pct,0)/studentDetail.progress.length)+"%":"0%",c:"#3B82F6"},
                   {l:"Topics",v:`${studentDetail.progress.filter(p=>p.pct>0).length}/${studentDetail.progress.length}`,c:"#8B5CF6"},
                   {l:"Quizzes",v:String(studentDetail.quiz_attempts.length),c:"#10B981"},
                   {l:"Exercises",v:String(studentDetail.exercises.length),c:"#F59E0B"},
                 ].map(s=>(
-                  <div key={s.l} style={{flex:1,minWidth:80,background:"rgba(15,23,42,0.5)",borderRadius:9,padding:"10px",textAlign:"center"}}>
-                    <div style={{fontSize:18,fontWeight:800,color:s.c}}>{s.v}</div>
+                  <div key={s.l} style={{background:"rgba(15,23,42,0.5)",borderRadius:9,padding:"8px 10px",textAlign:"center"}}>
+                    <div style={{fontSize:16,fontWeight:800,color:s.c}}>{s.v}</div>
                     <div style={{fontSize:9,color:"#475569",textTransform:"uppercase"}}>{s.l}</div>
                   </div>
                 ))}
               </div>
               {studentDetail.stuck_topics.length>0&&(
-                <div style={{background:"rgba(244,63,94,0.08)",border:"1px solid rgba(244,63,94,0.2)",borderRadius:10,padding:"10px 14px",marginBottom:16}}>
+                <div style={{background:"rgba(244,63,94,0.08)",border:"1px solid rgba(244,63,94,0.2)",borderRadius:10,padding:"8px 12px",marginBottom:14}}>
                   <div style={{fontSize:11,fontWeight:700,color:"#FB7185",marginBottom:4}}>Stuck On</div>
-                  <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                  <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
                     {studentDetail.stuck_topics.map(t=>(
-                      <span key={t} style={{fontSize:11,fontWeight:600,padding:"3px 8px",borderRadius:6,background:"rgba(244,63,94,0.15)",color:"#FB7185"}}>{t}</span>
+                      <span key={t} style={{fontSize:10,fontWeight:600,padding:"2px 7px",borderRadius:6,background:"rgba(244,63,94,0.15)",color:"#FB7185"}}>{t}</span>
                     ))}
                   </div>
                 </div>
               )}
-              <div style={{fontSize:12,fontWeight:700,color:"#E2E8F0",marginBottom:8}}>Progress by Topic</div>
-              <div style={{display:"grid",gap:6,marginBottom:16}}>
+              <div style={{fontSize:12,fontWeight:700,color:"#E2E8F0",marginBottom:6}}>Progress by Topic</div>
+              <div style={{display:"grid",gap:5,marginBottom:14}}>
                 {studentDetail.progress.map(p=>{const ls=LEVEL[p.level]||LEVEL.Beginner;return(
-                  <div key={p.topic} style={{display:"flex",alignItems:"center",gap:10,background:p.stuck?"rgba(244,63,94,0.06)":"rgba(15,23,42,0.4)",border:`1px solid ${p.stuck?"rgba(244,63,94,0.2)":"rgba(148,163,184,0.05)"}`,borderRadius:8,padding:"8px 12px"}}>
-                    <span style={{fontSize:12,fontWeight:600,color:"#E2E8F0",width:100,flexShrink:0}}>{p.topic}</span>
-                    <div style={{flex:1,height:4,borderRadius:99,background:"rgba(148,163,184,0.08)",overflow:"hidden"}}><div style={{height:"100%",width:`${p.pct}%`,borderRadius:99,background:p.stuck?"#F43F5E":ls.bar}}/></div>
-                    <span style={{fontSize:11,fontWeight:700,color:p.stuck?"#FB7185":ls.color,width:35,textAlign:"right"}}>{p.pct}%</span>
-                    <span style={{fontSize:9,fontWeight:600,padding:"2px 5px",borderRadius:99,color:ls.color,background:ls.bg}}>{ls.label}</span>
-                    {p.stuck&&<span style={{fontSize:9,color:"#F43F5E"}}>⚠️</span>}
+                  <div key={p.topic} style={{background:p.stuck?"rgba(244,63,94,0.06)":"rgba(15,23,42,0.4)",border:`1px solid ${p.stuck?"rgba(244,63,94,0.2)":"rgba(148,163,184,0.05)"}`,borderRadius:8,padding:"7px 10px"}}>
+                    <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:4}}>
+                      <span style={{fontSize:11,fontWeight:600,color:"#E2E8F0",flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.topic}</span>
+                      <span style={{fontSize:10,fontWeight:700,color:p.stuck?"#FB7185":ls.color,flexShrink:0}}>{p.pct}%</span>
+                      <span style={{fontSize:8,fontWeight:600,padding:"1px 5px",borderRadius:99,color:ls.color,background:ls.bg,flexShrink:0}}>{ls.label}</span>
+                      {p.stuck&&<span style={{fontSize:8,color:"#F43F5E",flexShrink:0}}>⚠️</span>}
+                    </div>
+                    <div style={{height:3,borderRadius:99,background:"rgba(148,163,184,0.08)",overflow:"hidden"}}><div style={{height:"100%",width:`${p.pct}%`,borderRadius:99,background:p.stuck?"#F43F5E":ls.bar}}/></div>
                   </div>
                 );})}
               </div>
               {studentDetail.quiz_attempts.length>0&&(<>
-                <div style={{fontSize:12,fontWeight:700,color:"#E2E8F0",marginBottom:8}}>Recent Quizzes</div>
-                <div style={{display:"grid",gap:4,marginBottom:16}}>
+                <div style={{fontSize:12,fontWeight:700,color:"#E2E8F0",marginBottom:6}}>Recent Quizzes</div>
+                <div style={{display:"grid",gap:4,marginBottom:14}}>
                   {studentDetail.quiz_attempts.slice(0,5).map((q,i)=>(
-                    <div key={i} style={{display:"flex",alignItems:"center",gap:8,background:"rgba(15,23,42,0.4)",borderRadius:7,padding:"7px 12px"}}>
-                      <span style={{fontSize:11,color:"#94A3B8",flex:1}}>{q.topic}</span>
-                      <span style={{fontSize:12,fontWeight:700,color:q.score/q.total>=0.7?"#34D399":q.score/q.total>=0.5?"#FBBF24":"#FB7185"}}>{q.score}/{q.total}</span>
-                      <span style={{fontSize:10,color:"#475569"}}>{new Date(q.date).toLocaleDateString()}</span>
+                    <div key={i} style={{display:"flex",alignItems:"center",gap:6,background:"rgba(15,23,42,0.4)",borderRadius:7,padding:"6px 10px",flexWrap:"wrap"}}>
+                      <span style={{fontSize:11,color:"#94A3B8",flex:1,minWidth:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{q.topic}</span>
+                      <span style={{fontSize:11,fontWeight:700,color:q.score/q.total>=0.7?"#34D399":q.score/q.total>=0.5?"#FBBF24":"#FB7185",flexShrink:0}}>{q.score}/{q.total}</span>
+                      <span style={{fontSize:9,color:"#475569",flexShrink:0}}>{new Date(q.date).toLocaleDateString()}</span>
                     </div>
                   ))}
                 </div>
               </>)}
-              <div style={{fontSize:12,fontWeight:700,color:"#E2E8F0",marginBottom:8}}>Quick Actions</div>
+              <div style={{fontSize:12,fontWeight:700,color:"#E2E8F0",marginBottom:6}}>Quick Actions</div>
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
-                <button onClick={()=>{setStudentDetail(null);setAssignModal({title:"Custom Exercise",description:"Practice exercise assigned by teacher.",starter_code:"# Write your solution here\n",difficulty:"beginner",topic:studentDetail.stuck_topics[0]||"General"});setAssignStudent(String(studentDetail.student.id));}} style={{padding:"10px",borderRadius:9,border:"1px solid #8B5CF630",background:"#8B5CF610",color:"#8B5CF6",fontSize:12,fontWeight:600,cursor:"pointer",textAlign:"center"}}>Assign Exercise</button>
-                <button onClick={()=>{setStudentDetail(null);setQuizTopic(studentDetail.stuck_topics[0]||"");}} style={{padding:"10px",borderRadius:9,border:"1px solid #3B82F630",background:"#3B82F610",color:"#3B82F6",fontSize:12,fontWeight:600,cursor:"pointer",textAlign:"center"}}>Generate Quiz</button>
+                <button onClick={()=>{setStudentDetail(null);setAssignModal({title:"Custom Exercise",description:"Practice exercise assigned by teacher.",starter_code:"# Write your solution here\n",difficulty:"beginner",topic:studentDetail.stuck_topics[0]||"General"});setAssignStudent(String(studentDetail.student.id));}} style={{padding:"10px 6px",borderRadius:9,border:"1px solid #8B5CF630",background:"#8B5CF610",color:"#8B5CF6",fontSize:11,fontWeight:600,cursor:"pointer",textAlign:"center"}}>Assign Exercise</button>
+                <button onClick={()=>{setStudentDetail(null);setQuizTopic(studentDetail.stuck_topics[0]||"");}} style={{padding:"10px 6px",borderRadius:9,border:"1px solid #3B82F630",background:"#3B82F610",color:"#3B82F6",fontSize:11,fontWeight:600,cursor:"pointer",textAlign:"center"}}>Generate Quiz</button>
               </div>
             </div>
           </>)}
