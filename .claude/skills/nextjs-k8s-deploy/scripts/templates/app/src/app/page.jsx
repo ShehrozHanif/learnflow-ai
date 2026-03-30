@@ -1014,6 +1014,9 @@ function StudentDashboard({ user, snippetCode, clearSnippetCode, onSignup }) {
   const [snippetDesc,setSnippetDesc]=useState("");
   const [snippetTags,setSnippetTags]=useState("");
   const [snippetSaving,setSnippetSaving]=useState(false);
+  const [reviews,setReviews]=useState([]);
+  const [unseenReviews,setUnseenReviews]=useState(0);
+  const [expandedReview,setExpandedReview]=useState(null);
 
   const saveSnippet=async()=>{
     if(!snippetTitle.trim()||!code.trim()){setToast({message:"Title and code are required",type:"error"});return;}
@@ -1060,11 +1063,12 @@ function StudentDashboard({ user, snippetCode, clearSnippetCode, onSignup }) {
     setListening(true);
   };
 
-  // Load assignments + quizzes
+  // Load assignments + quizzes + reviews
   useEffect(()=>{
     if(isDemo) return;
     fetch("/api/teacher/assign",{headers:authHeaders}).then(r=>r.ok?r.json():null).then(d=>{if(d&&d.exercises)setAssignments(d.exercises);}).catch(()=>{});
     fetch("/api/quizzes",{headers:authHeaders}).then(r=>r.ok?r.json():null).then(d=>{if(d&&d.quizzes)setQuizzes(d.quizzes);}).catch(()=>{});
+    fetch("/api/reviews",{headers:authHeaders}).then(r=>r.ok?r.json():null).then(d=>{if(d){setReviews(d.reviews||[]);setUnseenReviews(d.unseen_count||0);}}).catch(()=>{});
   },[]);
 
   const submitQuiz=async()=>{
@@ -1166,7 +1170,7 @@ function StudentDashboard({ user, snippetCode, clearSnippetCode, onSignup }) {
         </div>
       )}
       <div style={{display:"flex",alignItems:"center",background:"rgba(15,23,42,0.7)",borderBottom:"1px solid rgba(148,163,184,0.07)",flexShrink:0,padding:"0 4px",overflowX:"auto",WebkitOverflowScrolling:"touch"}}>
-        {TABS.map(t=>{const active=tab===t.id;return <button key={t.id} onClick={()=>setTab(t.id)} style={{display:"flex",alignItems:"center",gap:6,padding:"0 12px",height:42,border:"none",borderBottom:active?"2px solid #3B82F6":"2px solid transparent",cursor:"pointer",fontSize:13,fontWeight:active?600:400,color:active?"#93C5FD":"#64748B",background:"transparent",transition:"all 0.15s",whiteSpace:"nowrap",flexShrink:0}}><span>{t.icon}</span>{t.label}</button>;})}
+        {TABS.map(t=>{const active=tab===t.id;return <button key={t.id} onClick={()=>setTab(t.id)} style={{display:"flex",alignItems:"center",gap:6,padding:"0 12px",height:42,border:"none",borderBottom:active?"2px solid #3B82F6":"2px solid transparent",cursor:"pointer",fontSize:13,fontWeight:active?600:400,color:active?"#93C5FD":"#64748B",background:"transparent",transition:"all 0.15s",whiteSpace:"nowrap",flexShrink:0,position:"relative"}}><span>{t.icon}</span>{t.label}{t.id==="exercises"&&unseenReviews>0&&<span style={{width:16,height:16,borderRadius:"50%",background:"#8B5CF6",color:"white",fontSize:9,fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center",marginLeft:2}}>{unseenReviews}</span>}</button>;})}
         <div style={{marginLeft:"auto",display:"flex",alignItems:"center",gap:5,padding:"0 12px",flexShrink:0}}>
           <div style={{width:48,height:3,borderRadius:99,background:"rgba(148,163,184,0.1)",overflow:"hidden"}}><div style={{height:"100%",width:`${avgMastery}%`,borderRadius:99,background:"linear-gradient(90deg,#3B82F6,#818CF8)"}}/></div>
           <span style={{fontSize:11,fontWeight:700,color:"#60A5FA"}}>{avgMastery}%</span>
@@ -1400,6 +1404,63 @@ function StudentDashboard({ user, snippetCode, clearSnippetCode, onSignup }) {
                 })}
               </div>
             )}
+
+            {/* Teacher Reviews */}
+            {reviews.length>0&&(
+              <div style={{background:"rgba(30,41,59,0.4)",border:"1px solid rgba(139,92,246,0.15)",borderRadius:14,overflow:"hidden"}}>
+                <div style={{padding:"13px 15px",borderBottom:"1px solid rgba(148,163,184,0.06)",display:"flex",alignItems:"center",gap:9}}>
+                  <span style={{fontSize:13,fontWeight:600,color:"#F1F5F9"}}>Teacher Reviews</span>
+                  <span style={{fontSize:10,fontWeight:700,padding:"1px 6px",borderRadius:99,background:"rgba(139,92,246,0.15)",color:"#A78BFA",border:"1px solid rgba(139,92,246,0.25)"}}>{reviews.length}</span>
+                  {unseenReviews>0&&<span style={{fontSize:10,fontWeight:700,padding:"1px 6px",borderRadius:99,background:"rgba(245,158,11,0.15)",color:"#FBBF24",border:"1px solid rgba(245,158,11,0.25)"}}>{unseenReviews} new</span>}
+                </div>
+                {reviews.map((r,i)=>{
+                  const isOpen=expandedReview===r.id;
+                  return(
+                    <div key={r.id} style={{borderBottom:i<reviews.length-1?"1px solid rgba(148,163,184,0.04)":"none"}}>
+                      <div onClick={()=>{
+                        setExpandedReview(isOpen?null:r.id);
+                        if(!r.review_seen&&!isOpen){
+                          setUnseenReviews(prev=>Math.max(0,prev-1));
+                          r.review_seen=true;
+                          fetch("/api/reviews",{method:"POST",headers:{"Content-Type":"application/json",...authHeaders}}).catch(()=>{});
+                        }
+                      }} style={{padding:"12px 15px",display:"flex",alignItems:"center",gap:10,cursor:"pointer",transition:"background 0.15s"}} onMouseEnter={e=>e.currentTarget.style.background="rgba(148,163,184,0.03)"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+                        <div style={{width:28,height:28,borderRadius:8,background:r.result==="success"?"rgba(16,185,129,0.12)":"rgba(244,63,94,0.12)",border:`1px solid ${r.result==="success"?"rgba(16,185,129,0.25)":"rgba(244,63,94,0.25)"}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,flexShrink:0}}>{r.result==="success"?"✓":"✗"}</div>
+                        <div style={{flex:1,minWidth:0}}>
+                          <div style={{display:"flex",alignItems:"center",gap:6}}>
+                            <span style={{fontSize:13,fontWeight:500,color:"#E2E8F0"}}>Review by {r.reviewer_name}</span>
+                            {!r.review_seen&&<span style={{width:7,height:7,borderRadius:"50%",background:"#8B5CF6",flexShrink:0}}/>}
+                          </div>
+                          <div style={{fontSize:10,color:"#475569"}}>{new Date(r.reviewed_at).toLocaleString()}</div>
+                        </div>
+                        <span style={{fontSize:10,fontWeight:700,padding:"2px 7px",borderRadius:99,background:r.result==="success"?"rgba(16,185,129,0.1)":"rgba(244,63,94,0.1)",color:r.result==="success"?"#34D399":"#FB7185"}}>{r.result==="success"?"Pass":"Error"}</span>
+                        <span style={{fontSize:12,color:"#475569",transition:"transform 0.2s",transform:isOpen?"rotate(180deg)":"rotate(0deg)"}}>▼</span>
+                      </div>
+                      {isOpen&&(
+                        <div style={{padding:"0 15px 15px"}}>
+                          {r.teacher_remarks&&(
+                            <div style={{background:"rgba(139,92,246,0.04)",border:"1px solid rgba(139,92,246,0.12)",borderRadius:10,padding:"12px 14px",marginBottom:10}}>
+                              <div style={{fontSize:10,fontWeight:600,color:"#A78BFA",textTransform:"uppercase",marginBottom:4}}>Teacher's Remarks</div>
+                              <div style={{fontSize:12,color:"#CBD5E1",lineHeight:1.7,whiteSpace:"pre-wrap"}}>{r.teacher_remarks}</div>
+                            </div>
+                          )}
+                          <div style={{marginBottom:10}}>
+                            <div style={{fontSize:10,fontWeight:600,color:"#64748B",textTransform:"uppercase",marginBottom:4}}>Your Code</div>
+                            <pre style={{margin:0,padding:"10px 12px",background:"rgba(15,23,42,0.6)",borderRadius:8,fontSize:11,color:"#94A3B8",lineHeight:1.5,fontFamily:"'Cascadia Code','Fira Code',monospace",whiteSpace:"pre-wrap",wordBreak:"break-word",maxHeight:160,overflowY:"auto"}}>{r.code}</pre>
+                          </div>
+                          {r.teacher_code&&(
+                            <div>
+                              <div style={{fontSize:10,fontWeight:600,color:"#10B981",textTransform:"uppercase",marginBottom:4}}>Teacher's Corrected Code</div>
+                              <pre style={{margin:0,padding:"10px 12px",background:"rgba(16,185,129,0.04)",border:"1px solid rgba(16,185,129,0.12)",borderRadius:8,fontSize:11,color:"#E2E8F0",lineHeight:1.5,fontFamily:"'Cascadia Code','Fira Code',monospace",whiteSpace:"pre-wrap",wordBreak:"break-word",maxHeight:200,overflowY:"auto"}}>{r.teacher_code}</pre>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -1507,6 +1568,10 @@ function TeacherDashboard({ user, onSignup }) {
   const [detailLoading,setDetailLoading]=useState(false);
   const [codeViewer,setCodeViewer]=useState(null);
   const [codeLoading,setCodeLoading]=useState(false);
+  const [reviewOpen,setReviewOpen]=useState(null);
+  const [reviewRemarks,setReviewRemarks]=useState("");
+  const [reviewCode,setReviewCode]=useState("");
+  const [reviewSending,setReviewSending]=useState(false);
 
   const openStudentDetail = async (studentId) => {
     if(isDemo) return;
@@ -1539,6 +1604,27 @@ function TeacherDashboard({ user, onSignup }) {
       setTimeout(() => setToast(null), 3000);
     }
     setCodeLoading(false);
+  };
+
+  const sendReview = async (submissionId) => {
+    if(!reviewRemarks.trim()&&!reviewCode.trim()) return;
+    setReviewSending(true);
+    try {
+      const res = await fetch("/api/teacher/review-code", {
+        method: "POST", headers: authHeaders,
+        body: JSON.stringify({ submission_id: submissionId, teacher_remarks: reviewRemarks.trim()||null, teacher_code: reviewCode.trim()||null })
+      });
+      if(!res.ok) throw new Error("Failed to send review");
+      // Update local state to show reviewed badge
+      setCodeViewer(prev => prev ? {...prev, submissions: prev.submissions.map(s => s.id===submissionId ? {...s, reviewed_at: new Date().toISOString(), teacher_remarks: reviewRemarks.trim(), teacher_code: reviewCode.trim()} : s)} : prev);
+      setReviewOpen(null); setReviewRemarks(""); setReviewCode("");
+      setToast({ message: "Review sent! Student will see it on their dashboard.", type: "success" });
+      setTimeout(() => setToast(null), 4000);
+    } catch(e) {
+      setToast({ message: e.message || "Failed to send review", type: "error" });
+      setTimeout(() => setToast(null), 3000);
+    }
+    setReviewSending(false);
   };
 
   const ALERT_TYPE_LABELS = {
@@ -1737,6 +1823,43 @@ function TeacherDashboard({ user, onSignup }) {
                     <div style={{padding:"10px 14px",borderTop:"1px solid rgba(148,163,184,0.06)",background:"rgba(15,23,42,0.3)"}}>
                       <div style={{fontSize:10,fontWeight:600,color:"#64748B",textTransform:"uppercase",marginBottom:4}}>Output / Error</div>
                       <pre style={{margin:0,fontSize:11,color:s.result==="success"?"#94A3B8":"#FB7185",lineHeight:1.5,fontFamily:"'Cascadia Code','Fira Code',monospace",whiteSpace:"pre-wrap",wordBreak:"break-word",maxHeight:120,overflowY:"auto"}}>{s.feedback}</pre>
+                    </div>
+                  )}
+                  {/* Existing review badge */}
+                  {s.reviewed_at&&reviewOpen!==s.id&&(
+                    <div style={{padding:"10px 14px",borderTop:"1px solid rgba(148,163,184,0.06)",background:"rgba(139,92,246,0.04)"}}>
+                      <div style={{display:"flex",alignItems:"center",gap:6}}>
+                        <span style={{fontSize:10,fontWeight:700,padding:"2px 7px",borderRadius:99,background:"rgba(139,92,246,0.12)",color:"#A78BFA",border:"1px solid rgba(139,92,246,0.25)"}}>Reviewed</span>
+                        <span style={{fontSize:10,color:"#64748B"}}>{new Date(s.reviewed_at).toLocaleString()}</span>
+                        <button onClick={()=>{setReviewOpen(s.id);setReviewRemarks(s.teacher_remarks||"");setReviewCode(s.teacher_code||"");}} style={{marginLeft:"auto",fontSize:10,fontWeight:600,color:"#A78BFA",background:"transparent",border:"none",cursor:"pointer",textDecoration:"underline"}}>Edit Review</button>
+                      </div>
+                      {s.teacher_remarks&&<div style={{fontSize:11,color:"#CBD5E1",marginTop:6,lineHeight:1.5}}>{s.teacher_remarks}</div>}
+                    </div>
+                  )}
+                  {/* Review action bar */}
+                  {!s.reviewed_at&&reviewOpen!==s.id&&(
+                    <div style={{padding:"8px 14px",borderTop:"1px solid rgba(148,163,184,0.06)",display:"flex",justifyContent:"flex-end"}}>
+                      <button onClick={()=>{setReviewOpen(s.id);setReviewRemarks("");setReviewCode(s.code||"");}} style={{padding:"5px 14px",borderRadius:7,border:"1px solid rgba(139,92,246,0.25)",background:"rgba(139,92,246,0.08)",color:"#A78BFA",fontSize:11,fontWeight:600,cursor:"pointer",display:"flex",alignItems:"center",gap:4}}>
+                        <span>📝</span> Add Review
+                      </button>
+                    </div>
+                  )}
+                  {/* Expanded review form */}
+                  {reviewOpen===s.id&&(
+                    <div style={{padding:"14px",borderTop:"1px solid rgba(139,92,246,0.15)",background:"rgba(139,92,246,0.03)"}}>
+                      <div style={{fontSize:12,fontWeight:700,color:"#A78BFA",marginBottom:10}}>Teacher Review</div>
+                      <div style={{marginBottom:10}}>
+                        <div style={{fontSize:10,fontWeight:600,color:"#64748B",textTransform:"uppercase",marginBottom:4}}>Remarks</div>
+                        <textarea value={reviewRemarks} onChange={e=>setReviewRemarks(e.target.value)} placeholder="Great job! / Here's what you can improve..." rows={3} style={{width:"100%",background:"rgba(15,23,42,0.6)",border:"1px solid rgba(148,163,184,0.15)",borderRadius:8,padding:"10px 12px",color:"#E2E8F0",fontSize:12,lineHeight:1.6,fontFamily:"inherit",resize:"vertical",outline:"none"}}/>
+                      </div>
+                      <div style={{marginBottom:12}}>
+                        <div style={{fontSize:10,fontWeight:600,color:"#64748B",textTransform:"uppercase",marginBottom:4}}>Corrected Code <span style={{fontWeight:400,textTransform:"none"}}>(optional)</span></div>
+                        <textarea value={reviewCode} onChange={e=>setReviewCode(e.target.value)} placeholder="Paste corrected or improved code here..." rows={5} style={{width:"100%",background:"rgba(15,23,42,0.6)",border:"1px solid rgba(148,163,184,0.15)",borderRadius:8,padding:"10px 12px",color:"#ABB2BF",fontSize:12,lineHeight:1.6,fontFamily:"'Cascadia Code','Fira Code',monospace",resize:"vertical",outline:"none",tabSize:4}} onKeyDown={e=>{if(e.key==="Tab"){e.preventDefault();const start=e.target.selectionStart;const end=e.target.selectionEnd;setReviewCode(reviewCode.substring(0,start)+"    "+reviewCode.substring(end));setTimeout(()=>{e.target.selectionStart=e.target.selectionEnd=start+4;},0);}}}/>
+                      </div>
+                      <div style={{display:"flex",gap:8,justifyContent:"flex-end"}}>
+                        <button onClick={()=>{setReviewOpen(null);setReviewRemarks("");setReviewCode("");}} style={{padding:"7px 14px",borderRadius:7,border:"1px solid rgba(148,163,184,0.15)",background:"transparent",color:"#94A3B8",fontSize:11,fontWeight:600,cursor:"pointer"}}>Cancel</button>
+                        <button onClick={()=>sendReview(s.id)} disabled={reviewSending||(!reviewRemarks.trim()&&!reviewCode.trim())} style={{padding:"7px 16px",borderRadius:7,border:"none",background:(reviewRemarks.trim()||reviewCode.trim())?"linear-gradient(135deg,#7C3AED,#8B5CF6)":"rgba(148,163,184,0.1)",color:(reviewRemarks.trim()||reviewCode.trim())?"white":"#475569",fontSize:11,fontWeight:600,cursor:(reviewRemarks.trim()||reviewCode.trim())?"pointer":"default"}}>{reviewSending?"Sending...":"Send Review"}</button>
+                      </div>
                     </div>
                   )}
                 </div>
