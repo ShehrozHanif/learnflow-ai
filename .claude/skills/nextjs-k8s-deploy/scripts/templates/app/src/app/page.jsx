@@ -1712,18 +1712,78 @@ function TeacherDashboard({ user, onSignup }) {
         </div>
       )}
       {assignModal&&<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.6)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center",padding:20}} onClick={()=>setAssignModal(null)}>
-        <div onClick={e=>e.stopPropagation()} style={{background:"#1E293B",border:"1px solid rgba(148,163,184,0.15)",borderRadius:16,padding:24,maxWidth:420,width:"100%"}}>
+        <div onClick={e=>e.stopPropagation()} style={{background:"#1E293B",border:"1px solid rgba(148,163,184,0.15)",borderRadius:16,padding:24,maxWidth:460,width:"100%",maxHeight:"85vh",overflowY:"auto"}}>
           <div style={{fontSize:15,fontWeight:700,color:"#F1F5F9",marginBottom:4}}>Assign Exercise</div>
-          <div style={{fontSize:12,color:"#94A3B8",marginBottom:16}}>{assignModal.title}</div>
-          <div style={{fontSize:12,color:"#94A3B8",marginBottom:6}}>Select Student:</div>
-          <select value={assignStudent} onChange={e=>setAssignStudent(e.target.value)} style={{width:"100%",padding:"10px 12px",background:"rgba(15,23,42,0.6)",border:"1px solid rgba(148,163,184,0.15)",borderRadius:9,color:"#E2E8F0",fontSize:13,marginBottom:16,fontFamily:"inherit"}}>
-            <option value="">Choose a student…</option>
-            {students.map(s=><option key={s.id} value={s.id}>{s.name} — {s.module} ({s.mastery}%)</option>)}
-          </select>
-          <div style={{display:"flex",gap:8,justifyContent:"flex-end"}}>
-            <button onClick={()=>setAssignModal(null)} style={{padding:"8px 16px",borderRadius:8,border:"1px solid rgba(148,163,184,0.15)",background:"transparent",color:"#94A3B8",fontSize:12,fontWeight:600,cursor:"pointer"}}>Cancel</button>
-            <button onClick={assignExercise} disabled={!assignStudent||assigning} style={{padding:"8px 16px",borderRadius:8,border:"none",background:assignStudent?"linear-gradient(135deg,#8B5CF6,#6366F1)":"rgba(148,163,184,0.1)",color:assignStudent?"white":"#475569",fontSize:12,fontWeight:600,cursor:assignStudent?"pointer":"default"}}>{assigning?"Assigning…":"Assign"}</button>
-          </div>
+          {assignModal.student_id ? (<>
+            {/* Smart assign — student pre-filled from alert */}
+            <div style={{display:"flex",alignItems:"center",gap:10,background:"rgba(139,92,246,0.06)",border:"1px solid rgba(139,92,246,0.15)",borderRadius:10,padding:"10px 14px",marginBottom:16,marginTop:8}}>
+              <div style={{width:32,height:32,borderRadius:"50%",background:"linear-gradient(135deg,#8B5CF6,#6366F1)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:700,color:"white",flexShrink:0}}>{assignModal.student_name?.split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase()}</div>
+              <div style={{flex:1}}>
+                <div style={{fontSize:13,fontWeight:600,color:"#E2E8F0"}}>{assignModal.student_name}</div>
+                <div style={{fontSize:10,color:"#A78BFA"}}>Struggling on {assignModal.topic||"General"}</div>
+              </div>
+            </div>
+            <div style={{display:"grid",gap:12,marginBottom:16}}>
+              <div>
+                <div style={{fontSize:11,fontWeight:600,color:"#94A3B8",marginBottom:4}}>Topic</div>
+                <select value={assignModal.topic||""} onChange={e=>setAssignModal(prev=>({...prev,topic:e.target.value}))} style={{width:"100%",padding:"10px 12px",background:"rgba(15,23,42,0.6)",border:"1px solid rgba(148,163,184,0.15)",borderRadius:9,color:"#E2E8F0",fontSize:13,fontFamily:"inherit"}}>
+                  {["Variables","Data Types","Loops","Lists","Functions","OOP","Error Handling","Libraries","General"].map(t=><option key={t} value={t}>{t}</option>)}
+                </select>
+              </div>
+              <div>
+                <div style={{fontSize:11,fontWeight:600,color:"#94A3B8",marginBottom:4}}>Difficulty Level</div>
+                <div style={{display:"flex",gap:6}}>
+                  {["beginner","intermediate","advanced"].map(d=>(
+                    <button key={d} onClick={()=>setAssignModal(prev=>({...prev,difficulty:d}))} style={{flex:1,padding:"9px",borderRadius:8,border:`1px solid ${assignModal.difficulty===d?"rgba(139,92,246,0.4)":"rgba(148,163,184,0.1)"}`,background:assignModal.difficulty===d?"rgba(139,92,246,0.12)":"rgba(15,23,42,0.4)",color:assignModal.difficulty===d?"#C4B5FD":"#64748B",fontSize:12,fontWeight:assignModal.difficulty===d?700:500,cursor:"pointer",textTransform:"capitalize"}}>{d}</button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <div style={{fontSize:11,fontWeight:600,color:"#94A3B8",marginBottom:4}}>Number of Questions</div>
+                <div style={{display:"flex",gap:6}}>
+                  {[5,7,10].map(n=>(
+                    <button key={n} onClick={()=>setAssignModal(prev=>({...prev,numQuestions:n}))} style={{flex:1,padding:"9px",borderRadius:8,border:`1px solid ${(assignModal.numQuestions||5)===n?"rgba(139,92,246,0.4)":"rgba(148,163,184,0.1)"}`,background:(assignModal.numQuestions||5)===n?"rgba(139,92,246,0.12)":"rgba(15,23,42,0.4)",color:(assignModal.numQuestions||5)===n?"#C4B5FD":"#64748B",fontSize:12,fontWeight:(assignModal.numQuestions||5)===n?700:500,cursor:"pointer"}}>{n} Qs</button>
+                  ))}
+                </div>
+              </div>
+            </div>
+            <div style={{display:"flex",gap:8,justifyContent:"flex-end"}}>
+              <button onClick={()=>setAssignModal(null)} style={{padding:"9px 18px",borderRadius:8,border:"1px solid rgba(148,163,184,0.15)",background:"transparent",color:"#94A3B8",fontSize:12,fontWeight:600,cursor:"pointer"}}>Cancel</button>
+              <button onClick={async()=>{
+                if(assigning)return;
+                if(!limiter.consume("generate_exercise")){setUpgradeModal("generate_exercise");return;}
+                setAssigning(true);
+                try{
+                  const topic=assignModal.topic||"General";
+                  const diff=assignModal.difficulty||"beginner";
+                  const numQ=assignModal.numQuestions||5;
+                  const genRes=await fetch("/api/teacher/exercises/generate",{method:"POST",headers:authHeaders,body:JSON.stringify({prompt:`Create a ${diff} Python exercise about ${topic} with ${numQ} questions/tasks. The student is struggling with this topic and needs practice.`,difficulty:diff,topic})});
+                  const ex=await genRes.json();
+                  if(!ex.title) throw new Error("Generation failed");
+                  const assignRes=await fetch("/api/teacher/assign",{method:"POST",headers:authHeaders,body:JSON.stringify({student_id:assignModal.student_id,title:ex.title,description:ex.description||"",starter_code:ex.starter_code||"",difficulty:diff,topic})});
+                  if(!assignRes.ok) throw new Error("Failed to assign");
+                  setAssignModal(null);setAssignStudent("");
+                  setToast({message:`Exercise "${ex.title}" generated and assigned to ${assignModal.student_name}!`,type:"success"});
+                  setTimeout(()=>setToast(null),4000);
+                }catch(e){setToast({message:e.message||"Failed to generate exercise",type:"error"});setTimeout(()=>setToast(null),3000);}
+                setAssigning(false);
+              }} disabled={assigning} style={{padding:"9px 20px",borderRadius:8,border:"none",background:"linear-gradient(135deg,#8B5CF6,#6366F1)",color:"white",fontSize:12,fontWeight:600,cursor:"pointer",opacity:assigning?0.6:1,display:"flex",alignItems:"center",gap:6}}>
+                {assigning?<><LoadingSpinner size={12} color="white"/> Generating...</>:<><span>✨</span> Generate & Assign</>}
+              </button>
+            </div>
+          </>) : (<>
+            {/* Fallback — manual assign (from student detail or other contexts) */}
+            <div style={{fontSize:12,color:"#94A3B8",marginBottom:16,marginTop:4}}>{assignModal.title}</div>
+            <div style={{fontSize:12,color:"#94A3B8",marginBottom:6}}>Select Student:</div>
+            <select value={assignStudent} onChange={e=>setAssignStudent(e.target.value)} style={{width:"100%",padding:"10px 12px",background:"rgba(15,23,42,0.6)",border:"1px solid rgba(148,163,184,0.15)",borderRadius:9,color:"#E2E8F0",fontSize:13,marginBottom:16,fontFamily:"inherit"}}>
+              <option value="">Choose a student…</option>
+              {students.map(s=><option key={s.id} value={s.id}>{s.name} — {s.module} ({s.mastery}%)</option>)}
+            </select>
+            <div style={{display:"flex",gap:8,justifyContent:"flex-end"}}>
+              <button onClick={()=>setAssignModal(null)} style={{padding:"8px 16px",borderRadius:8,border:"1px solid rgba(148,163,184,0.15)",background:"transparent",color:"#94A3B8",fontSize:12,fontWeight:600,cursor:"pointer"}}>Cancel</button>
+              <button onClick={assignExercise} disabled={!assignStudent||assigning} style={{padding:"8px 16px",borderRadius:8,border:"none",background:assignStudent?"linear-gradient(135deg,#8B5CF6,#6366F1)":"rgba(148,163,184,0.1)",color:assignStudent?"white":"#475569",fontSize:12,fontWeight:600,cursor:assignStudent?"pointer":"default"}}>{assigning?"Assigning…":"Assign"}</button>
+            </div>
+          </>)}
         </div>
       </div>}
       {(studentDetail||detailLoading)&&<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.7)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center",padding:20}} onClick={()=>{setStudentDetail(null);setDetailLoading(false);}}>
@@ -1990,7 +2050,7 @@ function TeacherDashboard({ user, onSignup }) {
               <div className="lf-grid-3" style={{gap:6}}>
                 <button onClick={()=>viewStudentCode(a.user_id, a.name, a.topic)} style={{padding:"7px 4px",borderRadius:7,border:"1px solid #3B82F630",background:"#3B82F612",color:"#3B82F6",fontSize:11,fontWeight:600,cursor:"pointer",textAlign:"center"}}>{codeLoading?"...":"View Code"}</button>
                 <button onClick={()=>resolveAlert(a.id)} style={{padding:"7px 4px",borderRadius:7,border:"1px solid #10B98130",background:"#10B98112",color:"#10B981",fontSize:11,fontWeight:600,cursor:"pointer",textAlign:"center"}}>Resolve</button>
-                <button onClick={()=>setAssignModal({title:`Help: ${a.topic}`,description:`Practice exercise for ${a.topic} — assigned because you need extra practice.`,starter_code:`# Practice: ${a.topic}\n# Write your solution here\n`,difficulty:"beginner",topic:a.topic})} style={{padding:"7px 4px",borderRadius:7,border:"1px solid #8B5CF630",background:"#8B5CF612",color:"#8B5CF6",fontSize:11,fontWeight:600,cursor:"pointer",textAlign:"center"}}>Assign</button>
+                <button onClick={()=>{setAssignModal({student_id:a.user_id,student_name:a.name,topic:a.topic,difficulty:"beginner",numQuestions:5});setAssignStudent(String(a.user_id));}} style={{padding:"7px 4px",borderRadius:7,border:"1px solid #8B5CF630",background:"#8B5CF612",color:"#8B5CF6",fontSize:11,fontWeight:600,cursor:"pointer",textAlign:"center"}}>Assign</button>
               </div>
             </div>
           );})}
