@@ -3776,9 +3776,10 @@ export default function App() {
         *, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
         html { scroll-behavior:smooth; }
         html, body { background:var(--lf-bg,#0F172A); font-family:'Inter',system-ui,sans-serif; height:100%; transition:background 0.3s; }
-        ::-webkit-scrollbar { width:4px; height:4px; }
-        ::-webkit-scrollbar-track { background:transparent; }
-        ::-webkit-scrollbar-thumb { background:rgba(148,163,184,0.15); border-radius:99px; }
+        ::-webkit-scrollbar { width:6px; height:6px; }
+        ::-webkit-scrollbar-track { background:rgba(30,41,59,0.5); border-radius:99px; }
+        ::-webkit-scrollbar-thumb { background:rgba(148,163,184,0.45); border-radius:99px; }
+        ::-webkit-scrollbar-thumb:hover { background:rgba(148,163,184,0.65); }
         input:focus, button:focus, textarea:focus { outline:none; }
         a { text-decoration:none; }
         @keyframes fadein  { from{opacity:0;transform:translateY(5px)} to{opacity:1;transform:translateY(0)} }
