@@ -25,7 +25,7 @@ spec:
     spec:
       containers:
         - name: agent
-          image: us-central1-docker.pkg.dev/todo-platform-489221/learnflow-repo/learnflow-agent:latest
+          image: us-central1-docker.pkg.dev/todo-platform-489221/learnflow-repo/learnflow-agent:3249b6d5594054ee404a4e7802d0927bd0906b99
           imagePullPolicy: Always
           ports:
             - containerPort: 8000
@@ -96,7 +96,7 @@ spec:
     spec:
       containers:
         - name: agent
-          image: us-central1-docker.pkg.dev/todo-platform-489221/learnflow-repo/learnflow-agent:latest
+          image: us-central1-docker.pkg.dev/todo-platform-489221/learnflow-repo/learnflow-agent:3249b6d5594054ee404a4e7802d0927bd0906b99
           imagePullPolicy: Always
           ports:
             - containerPort: 8000
@@ -162,7 +162,7 @@ spec:
     spec:
       containers:
         - name: agent
-          image: us-central1-docker.pkg.dev/todo-platform-489221/learnflow-repo/learnflow-agent:latest
+          image: us-central1-docker.pkg.dev/todo-platform-489221/learnflow-repo/learnflow-agent:3249b6d5594054ee404a4e7802d0927bd0906b99
           imagePullPolicy: Always
           ports:
             - containerPort: 8000
@@ -228,7 +228,7 @@ spec:
     spec:
       containers:
         - name: agent
-          image: us-central1-docker.pkg.dev/todo-platform-489221/learnflow-repo/learnflow-agent:latest
+          image: us-central1-docker.pkg.dev/todo-platform-489221/learnflow-repo/learnflow-agent:3249b6d5594054ee404a4e7802d0927bd0906b99
           imagePullPolicy: Always
           ports:
             - containerPort: 8000
@@ -294,7 +294,7 @@ spec:
     spec:
       containers:
         - name: agent
-          image: us-central1-docker.pkg.dev/todo-platform-489221/learnflow-repo/learnflow-agent:latest
+          image: us-central1-docker.pkg.dev/todo-platform-489221/learnflow-repo/learnflow-agent:3249b6d5594054ee404a4e7802d0927bd0906b99
           imagePullPolicy: Always
           ports:
             - containerPort: 8000
@@ -360,7 +360,7 @@ spec:
     spec:
       containers:
         - name: agent
-          image: us-central1-docker.pkg.dev/todo-platform-489221/learnflow-repo/learnflow-agent:latest
+          image: us-central1-docker.pkg.dev/todo-platform-489221/learnflow-repo/learnflow-agent:3249b6d5594054ee404a4e7802d0927bd0906b99
           imagePullPolicy: Always
           ports:
             - containerPort: 8000
