@@ -2227,6 +2227,7 @@ function TeachersPage({ user }) {
   const [removeModal, setRemoveModal] = useState(false);
   const [removing, setRemoving] = useState(false);
   const [toast, setToast] = useState(null);
+  const [upgradeModal, setUpgradeModal] = useState(false);
 
   const loadTeachers = () => {
     fetch("/api/teachers/list", { headers: authHeaders })
@@ -2291,7 +2292,7 @@ function TeachersPage({ user }) {
       <div style={{maxWidth:600,margin:"0 auto"}}>
         <div style={{fontSize:18,fontWeight:800,color:"#F1F5F9",marginBottom:4}}>Faculty</div>
         <div style={{fontSize:12,color:"#64748B",marginBottom:16}}>
-          {myMentorId ? "You have a mentor. You can switch anytime." : "Choose a mentor to get personalized guidance."}
+          {myMentorId ? "You have an active mentor." : "Browse our faculty and explore their profiles."}
         </div>
 
         {/* Current mentor banner */}
@@ -2300,21 +2301,13 @@ function TeachersPage({ user }) {
           if (!mentor) return null;
           return (
             <div style={{marginBottom:16}}>
-              <div style={{background: removalRequestedAt ? "rgba(245,158,11,0.06)" : "rgba(16,185,129,0.06)", border:`1px solid ${removalRequestedAt ? "rgba(245,158,11,0.2)" : "rgba(16,185,129,0.2)"}`,borderRadius:12,padding:"14px 16px",display:"flex",alignItems:"center",gap:12}}>
-                <div style={{width:36,height:36,borderRadius:"50%",background:`linear-gradient(135deg,${removalRequestedAt ? "#F59E0B,#D97706" : "#10B981,#059669"})`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,fontWeight:700,color:"white",flexShrink:0}}>{mentor.initials}</div>
+              <div style={{background:"rgba(16,185,129,0.06)",border:"1px solid rgba(16,185,129,0.2)",borderRadius:12,padding:"14px 16px",display:"flex",alignItems:"center",gap:12}}>
+                <div style={{width:36,height:36,borderRadius:"50%",background:"linear-gradient(135deg,#10B981,#059669)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,fontWeight:700,color:"white",flexShrink:0}}>{mentor.initials}</div>
                 <div style={{flex:1}}>
                   <div style={{fontSize:13,fontWeight:600,color:"#E2E8F0"}}>{mentor.name}</div>
-                  <div style={{fontSize:11,color:removalRequestedAt ? "#FBBF24" : "#34D399"}}>{removalRequestedAt ? `Removal in ${daysLeft} day${daysLeft !== 1 ? "s" : ""}` : "Your current mentor"}</div>
+                  <div style={{fontSize:11,color:"#34D399"}}>Your current mentor</div>
                 </div>
-                {removalRequestedAt ? (
-                  <button onClick={cancelRemoval} disabled={removing} style={{fontSize:10,fontWeight:700,padding:"5px 12px",borderRadius:99,border:"1px solid rgba(16,185,129,0.3)",background:"rgba(16,185,129,0.1)",color:"#34D399",cursor:"pointer",opacity:removing?0.6:1}}>
-                    {removing ? "..." : "Cancel Removal"}
-                  </button>
-                ) : (
-                  <button onClick={() => setRemoveModal(true)} style={{fontSize:10,fontWeight:700,padding:"5px 12px",borderRadius:99,border:"1px solid rgba(239,68,68,0.2)",background:"rgba(239,68,68,0.06)",color:"#F87171",cursor:"pointer"}}>
-                    Remove
-                  </button>
-                )}
+                <span style={{fontSize:9,fontWeight:700,padding:"3px 8px",borderRadius:99,background:"rgba(16,185,129,0.12)",color:"#34D399"}}>Enrolled</span>
               </div>
             </div>
           );
@@ -2392,15 +2385,15 @@ function TeachersPage({ user }) {
               )}
             </div>
 
-            {/* Enroll button */}
+            {/* Enroll button — gated behind Pro */}
             {selectedTeacher.is_my_mentor ? (
               <div style={{padding:"12px",borderRadius:10,background:"rgba(16,185,129,0.08)",border:"1px solid rgba(16,185,129,0.2)",textAlign:"center"}}>
                 <span style={{fontSize:13,fontWeight:600,color:"#34D399"}}>This is your current mentor ✓</span>
               </div>
             ) : (
-              <button onClick={() => enroll(selectedTeacher.id)} disabled={enrolling}
-                style={{width:"100%",padding:"12px",borderRadius:10,border:"none",background:"linear-gradient(135deg,#1D4ED8,#2563EB)",color:"white",fontWeight:600,fontSize:13,cursor:"pointer",opacity:enrolling?0.7:1}}>
-                {enrolling ? "Enrolling..." : myMentorId ? "Switch to This Mentor" : "Choose as My Mentor"}
+              <button onClick={() => { setSelectedTeacher(null); setUpgradeModal(true); }}
+                style={{width:"100%",padding:"12px",borderRadius:10,border:"none",background:"linear-gradient(135deg,#F59E0B,#D97706)",color:"white",fontWeight:600,fontSize:13,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
+                <span>⭐</span> Choose as My Mentor — Pro Only
               </button>
             )}
           </div>
@@ -2433,6 +2426,38 @@ function TeachersPage({ user }) {
           </div>
         );
       })()}
+
+      {/* Upgrade to Pro Modal */}
+      {upgradeModal && (
+        <div onClick={() => setUpgradeModal(false)} style={{position:"fixed",inset:0,zIndex:110,background:"rgba(0,0,0,0.75)",backdropFilter:"blur(8px)",display:"flex",alignItems:"center",justifyContent:"center",padding:16,animation:"fadein 0.2s ease"}}>
+          <div onClick={e=>e.stopPropagation()} style={{background:"#0F172A",border:"1px solid rgba(245,158,11,0.25)",borderRadius:18,padding:"32px 28px",maxWidth:440,width:"100%",boxShadow:"0 24px 64px -16px rgba(0,0,0,0.6)",textAlign:"center"}}>
+            <div style={{width:56,height:56,borderRadius:"50%",background:"linear-gradient(135deg,#F59E0B,#D97706)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:26,margin:"0 auto 16px"}}>⭐</div>
+            <div style={{fontSize:18,fontWeight:800,color:"#F1F5F9",marginBottom:6}}>Mentor Access is a Pro Feature</div>
+            <div style={{fontSize:13,color:"#94A3B8",lineHeight:1.7,marginBottom:20}}>Unlock 1-on-1 mentorship with experienced Python instructors to accelerate your learning journey.</div>
+            <div style={{display:"grid",gap:8,marginBottom:24,textAlign:"left"}}>
+              {[
+                { icon: "👨‍🏫", text: "Personalized guidance from expert mentors" },
+                { icon: "📝", text: "Custom exercises tailored to your weak spots" },
+                { icon: "🚀", text: "Priority support when you're stuck" },
+                { icon: "📊", text: "Detailed progress reviews from your mentor" },
+              ].map((f, i) => (
+                <div key={i} style={{display:"flex",alignItems:"center",gap:10,background:"rgba(245,158,11,0.04)",border:"1px solid rgba(245,158,11,0.1)",borderRadius:10,padding:"10px 14px"}}>
+                  <span style={{fontSize:16,flexShrink:0}}>{f.icon}</span>
+                  <span style={{fontSize:12,color:"#CBD5E1",lineHeight:1.5}}>{f.text}</span>
+                </div>
+              ))}
+            </div>
+            <div style={{display:"flex",gap:10}}>
+              <button onClick={() => setUpgradeModal(false)} style={{flex:1,padding:"12px",borderRadius:10,border:"1px solid rgba(148,163,184,0.15)",background:"rgba(30,41,59,0.6)",color:"#94A3B8",fontWeight:600,fontSize:13,cursor:"pointer"}}>
+                Maybe Later
+              </button>
+              <button onClick={() => { setUpgradeModal(false); setToast({ message: "Pro plan coming soon! Stay tuned.", type: "info" }); setTimeout(() => setToast(null), 4000); }} style={{flex:1,padding:"12px",borderRadius:10,border:"none",background:"linear-gradient(135deg,#F59E0B,#D97706)",color:"white",fontWeight:700,fontSize:13,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
+                <span>⭐</span> Upgrade to Pro
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
