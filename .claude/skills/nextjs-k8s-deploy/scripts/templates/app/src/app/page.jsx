@@ -1505,6 +1505,8 @@ function TeacherDashboard({ user, onSignup }) {
   const [statsExpanded,setStatsExpanded]=useState(null);
   const [studentDetail,setStudentDetail]=useState(null);
   const [detailLoading,setDetailLoading]=useState(false);
+  const [codeViewer,setCodeViewer]=useState(null);
+  const [codeLoading,setCodeLoading]=useState(false);
 
   const openStudentDetail = async (studentId) => {
     if(isDemo) return;
@@ -1520,6 +1522,23 @@ function TeacherDashboard({ user, onSignup }) {
       setDetailLoading(false);
     }
     setDetailLoading(false);
+  };
+
+  const viewStudentCode = async (userId, studentName, topic) => {
+    if(isDemo) return;
+    setCodeLoading(true);
+    setCodeViewer(null);
+    try {
+      const url = `/api/teacher/student-code?student_id=${userId}${topic ? `&topic=${encodeURIComponent(topic)}` : ""}`;
+      const res = await fetch(url, { headers: authHeaders });
+      if(!res.ok) throw new Error("Failed to load code");
+      const data = await res.json();
+      setCodeViewer({ studentName: data.student_name || studentName, topic: data.topic || topic, submissions: data.submissions || [] });
+    } catch(e) {
+      setToast({ message: e.message || "Failed to load student code", type: "error" });
+      setTimeout(() => setToast(null), 3000);
+    }
+    setCodeLoading(false);
   };
 
   const ALERT_TYPE_LABELS = {
@@ -1691,6 +1710,41 @@ function TeacherDashboard({ user, onSignup }) {
           </>)}
         </div>
       </div>}
+      {/* Code Viewer Modal */}
+      {(codeViewer||codeLoading)&&<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.75)",zIndex:1001,display:"flex",alignItems:"center",justifyContent:"center",padding:16,backdropFilter:"blur(6px)"}} onClick={()=>{setCodeViewer(null);setCodeLoading(false);}}>
+        <div onClick={e=>e.stopPropagation()} style={{background:"#0F172A",border:"1px solid rgba(148,163,184,0.15)",borderRadius:18,maxWidth:680,width:"100%",maxHeight:"85vh",display:"flex",flexDirection:"column",boxShadow:"0 24px 64px -16px rgba(0,0,0,0.7)"}}>
+          {codeLoading&&!codeViewer?<div style={{padding:40,textAlign:"center"}}><LoadingSpinner size={28} color="#3B82F6"/><div style={{fontSize:12,color:"#64748B",marginTop:8}}>Loading student code...</div></div>
+          :codeViewer&&(<>
+            <div style={{padding:"18px 22px",borderBottom:"1px solid rgba(148,163,184,0.1)",display:"flex",alignItems:"center",gap:12,flexShrink:0}}>
+              <div style={{width:36,height:36,borderRadius:"50%",background:"linear-gradient(135deg,#3B82F6,#1D4ED8)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,fontWeight:700,color:"white"}}>{codeViewer.studentName?.split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase()||"?"}</div>
+              <div style={{flex:1}}>
+                <div style={{fontSize:15,fontWeight:700,color:"#F1F5F9"}}>{codeViewer.studentName}'s Code</div>
+                <div style={{fontSize:11,color:"#64748B"}}>{codeViewer.topic ? `Topic: ${codeViewer.topic}` : "All recent submissions"} — {codeViewer.submissions.length} submission{codeViewer.submissions.length!==1?"s":""}</div>
+              </div>
+              <button onClick={()=>{setCodeViewer(null);setCodeLoading(false);}} style={{width:30,height:30,borderRadius:8,border:"1px solid rgba(148,163,184,0.1)",background:"rgba(30,41,59,0.6)",color:"#94A3B8",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontSize:16}}>✕</button>
+            </div>
+            <div style={{flex:1,overflowY:"auto",padding:"16px 22px"}}>
+              {codeViewer.submissions.length===0?<div style={{textAlign:"center",padding:32}}><div style={{fontSize:28,marginBottom:8}}>📭</div><div style={{fontSize:13,color:"#64748B"}}>No code submissions found for this student.</div></div>
+              :codeViewer.submissions.map((s,i)=>(
+                <div key={s.id} style={{marginBottom:i<codeViewer.submissions.length-1?16:0,background:"rgba(30,41,59,0.4)",border:"1px solid rgba(148,163,184,0.07)",borderRadius:12,overflow:"hidden"}}>
+                  <div style={{padding:"10px 14px",borderBottom:"1px solid rgba(148,163,184,0.06)",display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+                    <span style={{fontSize:10,fontWeight:700,padding:"2px 7px",borderRadius:99,background:s.result==="success"?"rgba(16,185,129,0.12)":"rgba(244,63,94,0.12)",color:s.result==="success"?"#34D399":"#FB7185",border:`1px solid ${s.result==="success"?"rgba(16,185,129,0.25)":"rgba(244,63,94,0.25)"}`}}>{s.result==="success"?"Pass":"Error"}</span>
+                    {s.topic&&<span style={{fontSize:10,color:"#64748B"}}>{s.topic}</span>}
+                    <span style={{fontSize:10,color:"#475569",marginLeft:"auto"}}>{new Date(s.submitted_at).toLocaleString()}</span>
+                  </div>
+                  <pre style={{margin:0,padding:"14px 16px",background:"rgba(15,23,42,0.6)",fontSize:12,color:"#E2E8F0",lineHeight:1.6,overflowX:"auto",fontFamily:"'Cascadia Code','Fira Code',monospace",whiteSpace:"pre-wrap",wordBreak:"break-word",maxHeight:240}}>{s.code}</pre>
+                  {s.feedback&&(
+                    <div style={{padding:"10px 14px",borderTop:"1px solid rgba(148,163,184,0.06)",background:"rgba(15,23,42,0.3)"}}>
+                      <div style={{fontSize:10,fontWeight:600,color:"#64748B",textTransform:"uppercase",marginBottom:4}}>Output / Error</div>
+                      <pre style={{margin:0,fontSize:11,color:s.result==="success"?"#94A3B8":"#FB7185",lineHeight:1.5,fontFamily:"'Cascadia Code','Fira Code',monospace",whiteSpace:"pre-wrap",wordBreak:"break-word",maxHeight:120,overflowY:"auto"}}>{s.feedback}</pre>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </>)}
+        </div>
+      </div>}
       <div style={{maxWidth:940,margin:"0 auto",display:"flex",flexDirection:"column",gap:18}}>
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(130px,1fr))",gap:10}}>
           {[{key:"students",label:"My Students",value:String(students.length||0),accent:"#3B82F6",e:"👥"},{key:"unassigned",label:"Unassigned",value:String(unassigned.length||0),accent:"#F59E0B",e:"🆓"},{key:"active",label:"Active Now",value:String([...students,...unassigned].filter(s=>s.active).length),accent:"#10B981",e:"⚡",pulse:true},{key:"struggling",label:"Struggling",value:String([...students,...unassigned].filter(s=>s.status==="Struggling").length+visible.length),accent:"#F43F5E",e:"⚠️"}].map(c=>(
@@ -1811,7 +1865,7 @@ function TeacherDashboard({ user, onSignup }) {
                 <span style={{fontSize:10,fontWeight:700,padding:"2px 7px",borderRadius:99,background:"rgba(244,63,94,0.1)",color:"#FB7185",border:"1px solid rgba(244,63,94,0.2)",marginLeft:"auto"}}>{a.attempts} attempts</span>
               </div>
               <div className="lf-grid-3" style={{gap:6}}>
-                <button style={{padding:"7px 4px",borderRadius:7,border:"1px solid #3B82F630",background:"#3B82F612",color:"#3B82F6",fontSize:11,fontWeight:600,cursor:"pointer",textAlign:"center"}}>View Code</button>
+                <button onClick={()=>viewStudentCode(a.user_id, a.name, a.topic)} style={{padding:"7px 4px",borderRadius:7,border:"1px solid #3B82F630",background:"#3B82F612",color:"#3B82F6",fontSize:11,fontWeight:600,cursor:"pointer",textAlign:"center"}}>{codeLoading?"...":"View Code"}</button>
                 <button onClick={()=>resolveAlert(a.id)} style={{padding:"7px 4px",borderRadius:7,border:"1px solid #10B98130",background:"#10B98112",color:"#10B981",fontSize:11,fontWeight:600,cursor:"pointer",textAlign:"center"}}>Resolve</button>
                 <button onClick={()=>setAssignModal({title:`Help: ${a.topic}`,description:`Practice exercise for ${a.topic} — assigned because you need extra practice.`,starter_code:`# Practice: ${a.topic}\n# Write your solution here\n`,difficulty:"beginner",topic:a.topic})} style={{padding:"7px 4px",borderRadius:7,border:"1px solid #8B5CF630",background:"#8B5CF612",color:"#8B5CF6",fontSize:11,fontWeight:600,cursor:"pointer",textAlign:"center"}}>Assign</button>
               </div>
