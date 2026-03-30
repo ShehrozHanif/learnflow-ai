@@ -1017,6 +1017,8 @@ function StudentDashboard({ user, snippetCode, clearSnippetCode, onSignup }) {
   const [reviews,setReviews]=useState([]);
   const [unseenReviews,setUnseenReviews]=useState(0);
   const [expandedReview,setExpandedReview]=useState(null);
+  const [notifications,setNotifications]=useState([]);
+  const [unseenNotifs,setUnseenNotifs]=useState(0);
 
   const saveSnippet=async()=>{
     if(!snippetTitle.trim()||!code.trim()){setToast({message:"Title and code are required",type:"error"});return;}
@@ -1069,6 +1071,7 @@ function StudentDashboard({ user, snippetCode, clearSnippetCode, onSignup }) {
     fetch("/api/teacher/assign",{headers:authHeaders}).then(r=>r.ok?r.json():null).then(d=>{if(d&&d.exercises)setAssignments(d.exercises);}).catch(()=>{});
     fetch("/api/quizzes",{headers:authHeaders}).then(r=>r.ok?r.json():null).then(d=>{if(d&&d.quizzes)setQuizzes(d.quizzes);}).catch(()=>{});
     fetch("/api/reviews",{headers:authHeaders}).then(r=>r.ok?r.json():null).then(d=>{if(d){setReviews(d.reviews||[]);setUnseenReviews(d.unseen_count||0);}}).catch(()=>{});
+    fetch("/api/notifications",{headers:authHeaders}).then(r=>r.ok?r.json():null).then(d=>{if(d){setNotifications(d.notifications||[]);setUnseenNotifs(d.unseen_count||0);}}).catch(()=>{});
   },[]);
 
   const submitQuiz=async()=>{
@@ -1170,7 +1173,7 @@ function StudentDashboard({ user, snippetCode, clearSnippetCode, onSignup }) {
         </div>
       )}
       <div style={{display:"flex",alignItems:"center",background:"rgba(15,23,42,0.7)",borderBottom:"1px solid rgba(148,163,184,0.07)",flexShrink:0,padding:"0 4px",overflowX:"auto",WebkitOverflowScrolling:"touch"}}>
-        {TABS.map(t=>{const active=tab===t.id;return <button key={t.id} onClick={()=>setTab(t.id)} style={{display:"flex",alignItems:"center",gap:6,padding:"0 12px",height:42,border:"none",borderBottom:active?"2px solid #3B82F6":"2px solid transparent",cursor:"pointer",fontSize:13,fontWeight:active?600:400,color:active?"#93C5FD":"#64748B",background:"transparent",transition:"all 0.15s",whiteSpace:"nowrap",flexShrink:0,position:"relative"}}><span>{t.icon}</span>{t.label}{t.id==="exercises"&&unseenReviews>0&&<span style={{width:16,height:16,borderRadius:"50%",background:"#8B5CF6",color:"white",fontSize:9,fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center",marginLeft:2}}>{unseenReviews}</span>}</button>;})}
+        {TABS.map(t=>{const active=tab===t.id;return <button key={t.id} onClick={()=>setTab(t.id)} style={{display:"flex",alignItems:"center",gap:6,padding:"0 12px",height:42,border:"none",borderBottom:active?"2px solid #3B82F6":"2px solid transparent",cursor:"pointer",fontSize:13,fontWeight:active?600:400,color:active?"#93C5FD":"#64748B",background:"transparent",transition:"all 0.15s",whiteSpace:"nowrap",flexShrink:0,position:"relative"}}><span>{t.icon}</span>{t.label}{t.id==="exercises"&&(unseenReviews+unseenNotifs)>0&&<span style={{width:16,height:16,borderRadius:"50%",background:"#8B5CF6",color:"white",fontSize:9,fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center",marginLeft:2}}>{unseenReviews+unseenNotifs}</span>}</button>;})}
         <div style={{marginLeft:"auto",display:"flex",alignItems:"center",gap:5,padding:"0 12px",flexShrink:0}}>
           <div style={{width:48,height:3,borderRadius:99,background:"rgba(148,163,184,0.1)",overflow:"hidden"}}><div style={{height:"100%",width:`${avgMastery}%`,borderRadius:99,background:"linear-gradient(90deg,#3B82F6,#818CF8)"}}/></div>
           <span style={{fontSize:11,fontWeight:700,color:"#60A5FA"}}>{avgMastery}%</span>
@@ -1319,7 +1322,7 @@ function StudentDashboard({ user, snippetCode, clearSnippetCode, onSignup }) {
             {activeExercise&&(
               <div style={{background:"rgba(30,41,59,0.4)",border:"1px solid rgba(59,130,246,0.15)",borderRadius:14,overflow:"hidden"}}>
                 <div style={{padding:"13px 15px",borderBottom:"1px solid rgba(148,163,184,0.06)",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-                  <div><div style={{fontSize:14,fontWeight:700,color:"#F1F5F9"}}>{activeExercise.title}</div><div style={{fontSize:11,color:"#64748B"}}>{activeExercise.topic} — {activeExercise.difficulty}</div></div>
+                  <div><div style={{fontSize:14,fontWeight:700,color:"#F1F5F9"}}>{activeExercise.title}</div><div style={{fontSize:11,color:"#64748B"}}>{activeExercise.topic} — {activeExercise.difficulty}{activeExercise.teacher_name?` · by ${activeExercise.teacher_name}`:""}</div></div>
                   <button onClick={()=>{setActiveExercise(null);setExCode("");setExResult(null);}} style={{fontSize:11,color:"#64748B",background:"transparent",border:"none",cursor:"pointer"}}>Close</button>
                 </div>
                 {activeExercise.description&&<div style={{padding:"10px 15px",fontSize:12,color:"#94A3B8",borderBottom:"1px solid rgba(148,163,184,0.04)"}}>{activeExercise.description}</div>}
@@ -1396,12 +1399,37 @@ function StudentDashboard({ user, snippetCode, clearSnippetCode, onSignup }) {
                       <div style={{flex:1,minWidth:0}}>
                         <div style={{fontSize:13,fontWeight:500,color:"#E2E8F0"}}>{ex.title}</div>
                         <div style={{fontSize:10,color:"#475569"}}>{ex.topic} — {ex.difficulty}{ex.grade!=null?` — Grade: ${ex.grade}/100`:""}</div>
+                        {ex.teacher_name&&<div style={{fontSize:10,color:"#A78BFA",marginTop:1}}>Assigned by {ex.teacher_name}</div>}
                       </div>
                       {done?<span style={{fontSize:10,fontWeight:700,padding:"2px 8px",borderRadius:99,background:"rgba(16,185,129,0.1)",color:"#34D399",border:"1px solid rgba(16,185,129,0.2)"}}>Done</span>
                       :<button onClick={()=>{setActiveExercise(ex);setExCode(ex.starter_code||"# Write your solution here\n");setExResult(null);}} style={{padding:"6px 12px",borderRadius:7,border:"1px solid rgba(59,130,246,0.25)",background:"rgba(59,130,246,0.1)",color:"#60A5FA",fontSize:11,fontWeight:600,cursor:"pointer"}}>Start</button>}
                     </div>
                   );
                 })}
+              </div>
+            )}
+
+            {/* Teacher Help Notifications */}
+            {notifications.length>0&&(
+              <div style={{background:"rgba(30,41,59,0.4)",border:"1px solid rgba(16,185,129,0.15)",borderRadius:14,overflow:"hidden"}}>
+                <div style={{padding:"13px 15px",borderBottom:"1px solid rgba(148,163,184,0.06)",display:"flex",alignItems:"center",gap:9}}>
+                  <span style={{fontSize:13,fontWeight:600,color:"#F1F5F9"}}>Teacher Activity</span>
+                  {unseenNotifs>0&&<span style={{fontSize:10,fontWeight:700,padding:"1px 6px",borderRadius:99,background:"rgba(16,185,129,0.15)",color:"#34D399",border:"1px solid rgba(16,185,129,0.25)"}}>{unseenNotifs} new</span>}
+                </div>
+                {notifications.slice(0,5).map((n,i)=>(
+                  <div key={n.id} onClick={()=>{
+                    if(!n.seen){setUnseenNotifs(prev=>Math.max(0,prev-1));n.seen=true;fetch("/api/notifications",{method:"POST",headers:{"Content-Type":"application/json",...authHeaders}}).catch(()=>{});}
+                  }} style={{padding:"10px 15px",borderBottom:i<Math.min(notifications.length,5)-1?"1px solid rgba(148,163,184,0.04)":"none",display:"flex",alignItems:"center",gap:10}}>
+                    <div style={{width:28,height:28,borderRadius:8,background:"rgba(16,185,129,0.12)",border:"1px solid rgba(16,185,129,0.25)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,flexShrink:0}}>✓</div>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontSize:12,color:"#E2E8F0"}}>
+                        <strong style={{color:"#34D399"}}>{n.resolved_by_name}</strong> helped with your <strong>{n.topic}</strong> struggle
+                      </div>
+                      <div style={{fontSize:10,color:"#475569"}}>{n.resolved_at?new Date(n.resolved_at).toLocaleString():""}</div>
+                    </div>
+                    {!n.seen&&<span style={{width:7,height:7,borderRadius:"50%",background:"#10B981",flexShrink:0}}/>}
+                  </div>
+                ))}
               </div>
             )}
 
