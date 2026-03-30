@@ -90,6 +90,122 @@ function useLocalStorage(key,initial) {
   useEffect(()=>{try{localStorage.setItem(key,JSON.stringify(val));}catch{}},[key,val]);
   return [val,setVal];
 }
+
+// ── USAGE LIMITS ──
+const USAGE_LIMITS = {
+  demo:   { chat:3, execute:2, quiz:1, exercise_grade:0, generate_exercise:1, generate_quiz:1, snippets_save:0 },
+  free:   { chat:10, execute:5, quiz:2, exercise_grade:2, generate_exercise:3, generate_quiz:3, snippets_save:5 },
+  pro:    { chat:Infinity, execute:Infinity, quiz:Infinity, exercise_grade:Infinity, generate_exercise:Infinity, generate_quiz:Infinity, snippets_save:Infinity },
+};
+const LIMIT_LABELS = { chat:"AI Chat Messages", execute:"Code Executions", quiz:"Quiz Attempts", exercise_grade:"Exercise Grading", generate_exercise:"Exercise Generation", generate_quiz:"Quiz Generation", snippets_save:"Saved Snippets" };
+
+function useLimits(user) {
+  const isDemo = !user || user.id === 0;
+  const tier = isDemo ? "demo" : (user?.tier || "free");
+  const limits = USAGE_LIMITS[tier] || USAGE_LIMITS.free;
+  const storageKey = isDemo ? "lf_demo_usage" : "lf_free_usage";
+
+  const getUsage = () => {
+    if (typeof window === "undefined") return {};
+    try {
+      const raw = (isDemo ? sessionStorage : localStorage).getItem(storageKey);
+      if (!raw) return {};
+      const parsed = JSON.parse(raw);
+      // For free tier, reset if date changed
+      if (!isDemo && parsed._date) {
+        const today = new Date().toISOString().slice(0,10);
+        if (parsed._date !== today) return { _date: today };
+      }
+      return parsed;
+    } catch { return {}; }
+  };
+
+  const setUsage = (usage) => {
+    try {
+      if (!isDemo) usage._date = new Date().toISOString().slice(0,10);
+      (isDemo ? sessionStorage : localStorage).setItem(storageKey, JSON.stringify(usage));
+    } catch {}
+  };
+
+  const check = (action) => {
+    if (tier === "pro") return { allowed: true, remaining: Infinity };
+    const usage = getUsage();
+    const used = usage[action] || 0;
+    const max = limits[action] ?? Infinity;
+    return { allowed: used < max, remaining: Math.max(0, max - used), limit: max, used };
+  };
+
+  const consume = (action) => {
+    if (tier === "pro") return true;
+    const usage = getUsage();
+    const used = usage[action] || 0;
+    const max = limits[action] ?? Infinity;
+    if (used >= max) return false;
+    usage[action] = used + 1;
+    setUsage(usage);
+    return true;
+  };
+
+  return { check, consume, tier, isDemo, limits };
+}
+
+function UpgradeModal({ action, tierInfo, onClose, onSignup }) {
+  const isDemo = tierInfo.isDemo;
+  const lbl = LIMIT_LABELS[action] || action;
+  const limit = tierInfo.limits[action] ?? 0;
+  return (
+    <div style={{ position:"fixed", inset:0, zIndex:9999, display:"flex", alignItems:"center", justifyContent:"center", background:"rgba(0,0,0,0.6)", backdropFilter:"blur(6px)" }} onClick={onClose}>
+      <div onClick={e=>e.stopPropagation()} style={{ background:"#1E293B", border:"1px solid rgba(148,163,184,0.15)", borderRadius:20, padding:"32px 28px", maxWidth:420, width:"90%", textAlign:"center", animation:"fadein 0.2s" }}>
+        <div style={{ fontSize:40, marginBottom:16 }}>{ limit===0 ? "🔒" : "⚡" }</div>
+        <h3 style={{ fontSize:18, fontWeight:700, color:"#E2E8F0", marginBottom:8 }}>
+          { limit===0 ? `${lbl} Not Available` : `${lbl} Limit Reached` }
+        </h3>
+        <p style={{ fontSize:13, color:"#94A3B8", lineHeight:1.7, marginBottom:20 }}>
+          {isDemo
+            ? limit===0
+              ? `This feature is not available in demo mode. Sign up for free to unlock ${lbl.toLowerCase()}!`
+              : `You've used all ${limit} free demo ${lbl.toLowerCase()}. Sign up to get ${USAGE_LIMITS.free[action]} ${lbl.toLowerCase()} per day — it's free!`
+            : `You've used all ${limit} daily ${lbl.toLowerCase()}. Upgrade to Pro for unlimited access!`
+          }
+        </p>
+        {isDemo ? (
+          <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+            <div style={{ background:"rgba(59,130,246,0.08)", border:"1px solid rgba(59,130,246,0.2)", borderRadius:12, padding:"14px 16px", textAlign:"left" }}>
+              <p style={{ fontSize:11, fontWeight:700, color:"#3B82F6", marginBottom:8, textTransform:"uppercase", letterSpacing:"0.08em" }}>Free Account Includes</p>
+              <div style={{ display:"flex", flexDirection:"column", gap:5 }}>
+                {Object.entries(USAGE_LIMITS.free).filter(([k])=>k!=="snippets_save").map(([k,v])=>(
+                  <div key={k} style={{ fontSize:12, color:"#94A3B8", display:"flex", alignItems:"center", gap:6 }}>
+                    <span style={{ color:"#3B82F6" }}>✓</span> {v} {LIMIT_LABELS[k]||k}/day
+                  </div>
+                ))}
+              </div>
+            </div>
+            <button onClick={onSignup} style={{ width:"100%", padding:"12px", borderRadius:10, border:"none", background:"linear-gradient(135deg,#3B82F6,#6366F1)", color:"white", fontSize:14, fontWeight:700, cursor:"pointer" }}>Sign Up Free</button>
+            <button onClick={onClose} style={{ width:"100%", padding:"10px", borderRadius:10, background:"rgba(148,163,184,0.08)", border:"1px solid rgba(148,163,184,0.1)", color:"#CBD5E1", fontSize:13, fontWeight:500, cursor:"pointer" }}>Continue Browsing</button>
+          </div>
+        ) : (
+          <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+            <div style={{ background:"rgba(139,92,246,0.08)", border:"1px solid rgba(139,92,246,0.2)", borderRadius:12, padding:"14px 16px", textAlign:"left" }}>
+              <p style={{ fontSize:11, fontWeight:700, color:"#8B5CF6", marginBottom:8, textTransform:"uppercase", letterSpacing:"0.08em" }}>Pro — $12/month</p>
+              <div style={{ display:"flex", flexDirection:"column", gap:5 }}>
+                {["Unlimited AI chat","Unlimited code runs","Unlimited quizzes & exercises","All 8 curriculum modules","Priority support"].map((f,i)=>(
+                  <div key={i} style={{ fontSize:12, color:"#94A3B8", display:"flex", alignItems:"center", gap:6 }}>
+                    <span style={{ color:"#8B5CF6" }}>✓</span> {f}
+                  </div>
+                ))}
+              </div>
+            </div>
+            <button onClick={onClose} style={{ width:"100%", padding:"12px", borderRadius:10, border:"none", background:"linear-gradient(135deg,#8B5CF6,#6366F1)", color:"white", fontSize:14, fontWeight:700, cursor:"pointer" }}>Upgrade to Pro</button>
+            <button onClick={onClose} style={{ width:"100%", padding:"10px", borderRadius:10, background:"rgba(148,163,184,0.08)", border:"1px solid rgba(148,163,184,0.1)", color:"#CBD5E1", fontSize:13, fontWeight:500, cursor:"pointer" }}>Maybe Later</button>
+          </div>
+        )}
+        <p style={{ fontSize:11, color:"#475569", marginTop:14 }}>
+          {isDemo ? "No credit card required" : "Resets daily at midnight"}
+        </p>
+      </div>
+    </div>
+  );
+}
 function Badge({ label, style:s }) {
   return <span style={{ fontSize:10, fontWeight:700, padding:"2px 8px", borderRadius:99, color:s.color, background:s.bg, border:`1px solid ${s.border}` }}>{label}</span>;
 }
@@ -128,19 +244,109 @@ const FEATURES = [
   { accent:"#F59E0B", accentBg:"rgba(245,158,11,0.12)",  label:"Struggle Detection",     desc:"Teachers get real-time alerts the moment a student is stuck — before they give up.", icon:"🔔" },
 ];
 const MODULES = [
-  { n:"01", label:"Basics",          sub:"Variables & I/O"        },
-  { n:"02", label:"Control Flow",    sub:"Loops & Conditions"      },
-  { n:"03", label:"Data Structures", sub:"Lists, Dicts, Sets"      },
-  { n:"04", label:"Functions",       sub:"Scope & Return"          },
-  { n:"05", label:"OOP",             sub:"Classes & Inheritance"   },
-  { n:"06", label:"Files",           sub:"CSV & JSON"              },
-  { n:"07", label:"Error Handling",  sub:"Try/Except"              },
-  { n:"08", label:"Libraries",       sub:"pip & APIs"              },
+  { n:"01", label:"Basics",          sub:"Variables & I/O",        topics:["Variables","Data Types","Input/Output","Operators","String Formatting"], projects:["Calculator App","Greeting Generator"], lessons:5, quizzes:3, exercises:2, time:"2 hours" },
+  { n:"02", label:"Control Flow",    sub:"Loops & Conditions",     topics:["if/elif/else","for Loops","while Loops","break/continue","Nested Conditions"], projects:["Number Guessing Game","FizzBuzz"], lessons:6, quizzes:3, exercises:3, time:"2.5 hours" },
+  { n:"03", label:"Data Structures", sub:"Lists, Dicts, Sets",     topics:["Lists","Tuples","Dictionaries","Sets","List Comprehensions"], projects:["Contact Book","Word Counter"], lessons:6, quizzes:4, exercises:3, time:"3 hours" },
+  { n:"04", label:"Functions",       sub:"Scope & Return",         topics:["Defining Functions","Parameters & Arguments","Return Values","Scope","Lambda Functions"], projects:["Math Toolkit","Password Generator"], lessons:5, quizzes:3, exercises:2, time:"2 hours" },
+  { n:"05", label:"OOP",             sub:"Classes & Inheritance",  topics:["Classes","Objects","Inheritance","Encapsulation","Polymorphism"], projects:["Bank Account System","Animal Hierarchy"], lessons:7, quizzes:4, exercises:3, time:"3.5 hours" },
+  { n:"06", label:"Files",           sub:"CSV & JSON",             topics:["Reading Files","Writing Files","CSV Processing","JSON Handling","File Paths"], projects:["Log Analyzer","Data Converter"], lessons:5, quizzes:3, exercises:2, time:"2 hours" },
+  { n:"07", label:"Error Handling",  sub:"Try/Except",             topics:["try/except","Exception Types","Custom Exceptions","finally Block","Debugging Tips"], projects:["Input Validator","Safe Calculator"], lessons:4, quizzes:2, exercises:2, time:"1.5 hours" },
+  { n:"08", label:"Libraries",       sub:"pip & APIs",             topics:["pip Install","Popular Libraries","API Requests","JSON APIs","Virtual Environments"], projects:["Weather App","API Dashboard"], lessons:5, quizzes:3, exercises:2, time:"2.5 hours" },
 ];
+
+function FeatureModal({ feature, onClose }) {
+  const modalContent = {
+    "AI Tutoring Agents": {
+      title: "6 Specialized AI Agents",
+      sections: [
+        { icon: "🎯", name: "Triage Agent", desc: "Analyzes your question and routes it to the best specialist. Uses NLP to understand intent — concepts, debugging, exercises, or code review." },
+        { icon: "📖", name: "Concepts Agent", desc: "Explains Python topics with clear examples and analogies. Adapts explanations to your current mastery level." },
+        { icon: "🔍", name: "Code Review Agent", desc: "Reviews your code for quality, best practices, and potential bugs. Provides actionable improvement suggestions." },
+        { icon: "🐛", name: "Debug Agent", desc: "Helps you understand and fix errors. Walks through your code step-by-step to find the root cause." },
+        { icon: "💪", name: "Exercise Agent", desc: "Creates practice challenges tailored to your level. Generates unique problems for topics you need to strengthen." },
+        { icon: "📈", name: "Progress Agent", desc: "Tracks your learning journey across all topics. Identifies strengths, weaknesses, and recommends what to study next." },
+      ]
+    },
+    "Live Code Editor": {
+      title: "Write & Run Python in Your Browser",
+      sections: [
+        { icon: "⚡", name: "Instant Execution", desc: "Run Python code directly in the browser with real-time output. No setup, no installation required." },
+        { icon: "🎨", name: "Syntax Highlighting", desc: "Monaco editor (same as VS Code) with full Python syntax highlighting and auto-completion." },
+        { icon: "🔒", name: "Secure Sandbox", desc: "Code runs in an isolated sandbox with 5-second timeout and memory limits. Safe for experimentation." },
+        { icon: "📊", name: "Execution Tracking", desc: "Every code run is tracked — success rate, streak, and consecutive failures feed into your progress score." },
+      ]
+    },
+    "Smart Progress Tracking": {
+      title: "Mastery-Based Learning System",
+      sections: [
+        { icon: "🔴", name: "Beginner (0-40%)", desc: "Just getting started. Focus on completing exercises and understanding core concepts." },
+        { icon: "🟡", name: "Learning (41-70%)", desc: "Building momentum. Keep practicing with quizzes and coding challenges to strengthen understanding." },
+        { icon: "🟢", name: "Proficient (71-90%)", desc: "Strong grasp of the topic. Polish your skills with advanced exercises and code quality improvements." },
+        { icon: "🔵", name: "Mastered (91-100%)", desc: "Expert level achieved! Maintain your streak and help others while exploring advanced patterns." },
+      ],
+      formula: true
+    },
+    "Struggle Detection": {
+      title: "Real-Time Student Support",
+      sections: [
+        { icon: "🔁", name: "Repeated Errors", desc: "5+ consecutive code failures trigger an alert. The system detects when a student is stuck in a loop." },
+        { icon: "😤", name: "Frustration Detection", desc: "NLP analyzes chat messages for signs of frustration. Proactive support before the student gives up." },
+        { icon: "📉", name: "Low Quiz Scores", desc: "Quiz scores below 50% generate an alert. Teachers can assign targeted exercises to address gaps." },
+        { icon: "⏰", name: "Time-Based Detection", desc: "3+ errors within 10 minutes suggests the student is stuck. Periodic checks catch struggling students early." },
+      ]
+    }
+  };
+  const content = modalContent[feature.label];
+  if (!content) return null;
+
+  return (
+    <div onClick={onClose} style={{position:"fixed",inset:0,zIndex:100,background:"rgba(0,0,0,0.7)",backdropFilter:"blur(8px)",display:"flex",alignItems:"center",justifyContent:"center",padding:16,animation:"fadein 0.2s ease"}}>
+      <div onClick={e=>e.stopPropagation()} style={{background:"#0F172A",border:`1px solid ${feature.accent}35`,borderRadius:18,padding:"28px 24px",maxWidth:520,width:"100%",maxHeight:"80vh",overflowY:"auto",boxShadow:`0 24px 64px -16px rgba(0,0,0,0.6),0 0 0 1px ${feature.accent}20`}}>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:20}}>
+          <div style={{display:"flex",alignItems:"center",gap:10}}>
+            <div style={{width:40,height:40,borderRadius:10,background:feature.accentBg,display:"flex",alignItems:"center",justifyContent:"center",fontSize:20}}>{feature.icon}</div>
+            <div>
+              <div style={{fontSize:16,fontWeight:700,color:"#F1F5F9"}}>{content.title}</div>
+              <div style={{fontSize:11,color:"#64748B"}}>{feature.label}</div>
+            </div>
+          </div>
+          <button onClick={onClose} style={{width:30,height:30,borderRadius:8,border:"1px solid rgba(148,163,184,0.1)",background:"rgba(30,41,59,0.6)",color:"#94A3B8",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontSize:16}}>x</button>
+        </div>
+        <div style={{display:"grid",gap:8}}>
+          {content.sections.map((s,i) => (
+            <div key={i} style={{background:"rgba(30,41,59,0.5)",border:"1px solid rgba(148,163,184,0.07)",borderRadius:10,padding:"14px 16px",display:"flex",gap:12,alignItems:"flex-start"}}>
+              <span style={{fontSize:18,flexShrink:0,marginTop:2}}>{s.icon}</span>
+              <div>
+                <div style={{fontSize:13,fontWeight:600,color:"#E2E8F0",marginBottom:3}}>{s.name}</div>
+                <div style={{fontSize:12,color:"#94A3B8",lineHeight:1.6}}>{s.desc}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+        {content.formula && (
+          <div style={{marginTop:14,background:"rgba(30,41,59,0.5)",border:"1px solid rgba(148,163,184,0.07)",borderRadius:10,padding:"14px 16px"}}>
+            <div style={{fontSize:12,fontWeight:600,color:"#E2E8F0",marginBottom:8}}>Mastery Formula</div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6}}>
+              {[{l:"Exercises",w:"40%",c:"#3B82F6"},{l:"Quizzes",w:"30%",c:"#8B5CF6"},{l:"Code Quality",w:"20%",c:"#10B981"},{l:"Streak",w:"10%",c:"#F59E0B"}].map(m=>(
+                <div key={m.l} style={{display:"flex",alignItems:"center",gap:6}}>
+                  <div style={{width:8,height:8,borderRadius:99,background:m.c}}/>
+                  <span style={{fontSize:11,color:"#94A3B8"}}>{m.l}: <span style={{fontWeight:700,color:m.c}}>{m.w}</span></span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+        <button onClick={onClose} style={{marginTop:16,width:"100%",padding:"10px",borderRadius:10,border:"none",background:`${feature.accent}20`,color:feature.accent,fontWeight:600,fontSize:13,cursor:"pointer"}}>Got it</button>
+      </div>
+    </div>
+  );
+}
 
 function LandingPage({ onNavigate }) {
   const [hovered, setHovered] = useState(null);
   const [mobileMenu, setMobileMenu] = useState(false);
+  const [activeFeature, setActiveFeature] = useState(null);
+  const [activeModule, setActiveModule] = useState(null);
 
   return (
     <div style={{ fontFamily:"'Inter',system-ui,sans-serif", minHeight:"100vh", background:"#0F172A", color:"#E2E8F0", overflowX:"hidden", position:"relative" }}>
@@ -173,9 +379,9 @@ function LandingPage({ onNavigate }) {
 
         {/* desktop nav */}
         <div style={{ display:"flex", alignItems:"center", gap:24, fontSize:13, color:"#94A3B8" }} className="lf-hide-mobile">
-          {["Features","Curriculum","For Teachers","Pricing"].map(item=>(
-            <a key={item} href="#" style={{ color:"#94A3B8", textDecoration:"none", transition:"color 0.15s" }}
-              onMouseEnter={e=>e.target.style.color="#E2E8F0"} onMouseLeave={e=>e.target.style.color="#94A3B8"}>{item}</a>
+          {[{label:"Features",id:"features"},{label:"Curriculum",id:"curriculum"},{label:"For Teachers",id:"for-teachers"},{label:"Pricing",id:"pricing"}].map(item=>(
+            <a key={item.id} href={`#${item.id}`} style={{ color:"#94A3B8", textDecoration:"none", transition:"color 0.15s" }}
+              onMouseEnter={e=>e.target.style.color="#E2E8F0"} onMouseLeave={e=>e.target.style.color="#94A3B8"}>{item.label}</a>
           ))}
         </div>
 
@@ -195,14 +401,14 @@ function LandingPage({ onNavigate }) {
       {/* mobile menu */}
       {mobileMenu && (
         <div style={{ position:"relative", zIndex:20, background:"rgba(15,23,42,0.99)", borderBottom:"1px solid rgba(148,163,184,0.08)", padding:"10px 16px 14px" }}>
-          {["Features","Curriculum","For Teachers","Pricing"].map(item=>(
-            <div key={item} style={{ padding:"10px 4px", fontSize:14, color:"#94A3B8", borderBottom:"1px solid rgba(148,163,184,0.05)" }}>{item}</div>
+          {[{label:"Features",id:"features"},{label:"Curriculum",id:"curriculum"},{label:"For Teachers",id:"for-teachers"},{label:"Pricing",id:"pricing"}].map(item=>(
+            <a key={item.id} href={`#${item.id}`} onClick={()=>setMobileMenu(false)} style={{ display:"block", padding:"10px 4px", fontSize:14, color:"#94A3B8", borderBottom:"1px solid rgba(148,163,184,0.05)", textDecoration:"none" }}>{item.label}</a>
           ))}
         </div>
       )}
 
       {/* ── HERO ── */}
-      <section style={{ position:"relative", zIndex:10, display:"flex", flexDirection:"column", alignItems:"center", textAlign:"center", padding:"80px 20px 64px" }}>
+      <section className="lf-hero-pad" style={{ position:"relative", zIndex:10, display:"flex", flexDirection:"column", alignItems:"center", textAlign:"center", padding:"80px 20px 64px" }}>
         {/* eyebrow */}
         <div style={{ display:"inline-flex", alignItems:"center", gap:8, fontSize:11, fontWeight:600, letterSpacing:"0.12em", textTransform:"uppercase", marginBottom:28, padding:"6px 16px", borderRadius:99, background:"rgba(59,130,246,0.1)", border:"1px solid rgba(59,130,246,0.2)", color:"#93C5FD" }}>
           <span style={{ width:6, height:6, borderRadius:"50%", background:"#60A5FA", display:"inline-block", animation:"pulse2 2s ease-in-out infinite" }}/>
@@ -267,27 +473,28 @@ function LandingPage({ onNavigate }) {
       </section>
 
       {/* ── FEATURES ── */}
-      <section style={{ position:"relative", zIndex:10, padding:"0 20px 72px", maxWidth:1080, margin:"0 auto" }}>
+      <section id="features" style={{ position:"relative", zIndex:10, padding:"0 20px 72px", maxWidth:1080, margin:"0 auto", scrollMarginTop:60 }}>
         <div style={{ textAlign:"center", marginBottom:48 }}>
           <p style={{ fontSize:10, fontWeight:700, letterSpacing:"0.12em", textTransform:"uppercase", color:"#475569", marginBottom:10 }}>Platform</p>
           <h2 style={{ fontSize:"clamp(1.6rem,4vw,2.4rem)", fontWeight:800, color:"white", letterSpacing:"-0.02em" }}>Everything you need to learn Python</h2>
         </div>
         <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(220px,1fr))", gap:12 }}>
           {FEATURES.map((f,i)=>(
-            <div key={i} style={{ background:"rgba(15,23,42,0.6)", border:`1px solid ${f.accent}25`, borderRadius:14, padding:"22px 20px", backdropFilter:"blur(12px)", transition:"all 0.2s", cursor:"default" }}
+            <div key={i} onClick={()=>setActiveFeature(f)} style={{ background:"rgba(15,23,42,0.6)", border:`1px solid ${f.accent}25`, borderRadius:14, padding:"22px 20px", backdropFilter:"blur(12px)", transition:"all 0.2s", cursor:"pointer" }}
               onMouseEnter={e=>{ e.currentTarget.style.transform="translateY(-4px)"; e.currentTarget.style.borderColor=`${f.accent}45`; e.currentTarget.style.boxShadow=`0 12px 32px -8px rgba(0,0,0,0.4)`; }}
               onMouseLeave={e=>{ e.currentTarget.style.transform="translateY(0)"; e.currentTarget.style.borderColor=`${f.accent}25`; e.currentTarget.style.boxShadow="none"; }}
             >
               <div style={{ width:40, height:40, borderRadius:10, background:f.accentBg, display:"flex", alignItems:"center", justifyContent:"center", fontSize:20, marginBottom:14 }}>{f.icon}</div>
               <h3 style={{ fontSize:13, fontWeight:600, color:"#E2E8F0", marginBottom:7 }}>{f.label}</h3>
               <p style={{ fontSize:12, color:"#64748B", lineHeight:1.65 }}>{f.desc}</p>
+              <div style={{ marginTop:10, fontSize:10, fontWeight:600, color:f.accent, display:"flex", alignItems:"center", gap:4 }}>Learn more <span style={{fontSize:12}}>→</span></div>
             </div>
           ))}
         </div>
       </section>
 
       {/* ── CURRICULUM ── */}
-      <section style={{ position:"relative", zIndex:10, padding:"0 20px 72px", maxWidth:860, margin:"0 auto" }}>
+      <section id="curriculum" style={{ position:"relative", zIndex:10, padding:"0 20px 72px", maxWidth:860, margin:"0 auto", scrollMarginTop:60 }}>
         <div style={{ background:"rgba(15,23,42,0.7)", border:"1px solid rgba(148,163,184,0.08)", borderRadius:20, padding:"28px 24px", backdropFilter:"blur(16px)" }}>
           <div style={{ display:"flex", flexWrap:"wrap", alignItems:"center", justifyContent:"space-between", gap:12, marginBottom:24 }}>
             <div>
@@ -298,15 +505,123 @@ function LandingPage({ onNavigate }) {
           </div>
           <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(160px,1fr))", gap:8 }}>
             {MODULES.map(m=>(
-              <div key={m.n} style={{ background:"rgba(30,41,59,0.8)", border:"1px solid rgba(148,163,184,0.06)", borderRadius:10, padding:"11px 13px", transition:"border-color 0.18s", cursor:"default" }}
-                onMouseEnter={e=>e.currentTarget.style.borderColor="rgba(59,130,246,0.2)"}
-                onMouseLeave={e=>e.currentTarget.style.borderColor="rgba(148,163,184,0.06)"}
+              <div key={m.n} onClick={()=>setActiveModule(m)} style={{ background:"rgba(30,41,59,0.8)", border:"1px solid rgba(148,163,184,0.06)", borderRadius:10, padding:"11px 13px", transition:"all 0.18s", cursor:"pointer" }}
+                onMouseEnter={e=>{e.currentTarget.style.borderColor="rgba(59,130,246,0.25)";e.currentTarget.style.transform="translateY(-2px)";}}
+                onMouseLeave={e=>{e.currentTarget.style.borderColor="rgba(148,163,184,0.06)";e.currentTarget.style.transform="translateY(0)";}}
               >
                 <span style={{ fontSize:10, fontFamily:"monospace", color:"rgba(59,130,246,0.5)", display:"block", marginBottom:3 }}>{m.n}</span>
                 <span style={{ fontSize:13, fontWeight:600, color:"#E2E8F0", display:"block", lineHeight:1.3 }}>{m.label}</span>
                 <span style={{ fontSize:11, color:"#475569" }}>{m.sub}</span>
+                <div style={{ marginTop:6, display:"flex", gap:8, fontSize:9, color:"#475569" }}>
+                  <span>{m.lessons} lessons</span><span>·</span><span>{m.quizzes} quizzes</span><span>·</span><span>{m.time}</span>
+                </div>
               </div>
             ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── FOR TEACHERS ── */}
+      <section id="for-teachers" style={{ position:"relative", zIndex:10, padding:"0 20px 72px", maxWidth:1080, margin:"0 auto", scrollMarginTop:60 }}>
+        <div style={{ textAlign:"center", marginBottom:48 }}>
+          <p style={{ fontSize:10, fontWeight:700, letterSpacing:"0.12em", textTransform:"uppercase", color:"#475569", marginBottom:10 }}>For Educators</p>
+          <h2 style={{ fontSize:"clamp(1.6rem,4vw,2.4rem)", fontWeight:800, color:"white", letterSpacing:"-0.02em" }}>Empower your classroom with AI</h2>
+          <p style={{ fontSize:14, color:"#64748B", marginTop:12, maxWidth:520, margin:"12px auto 0" }}>Real-time insights into every student's progress. Detect struggles before they escalate.</p>
+        </div>
+        <div className="lf-teachers-grid" style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(240px,1fr))", gap:14 }}>
+          {[
+            { icon:"🔔", title:"Struggle Detection", desc:"Get instant alerts when students hit repeated errors, show frustration, or score low on quizzes.", accent:"#F59E0B" },
+            { icon:"📊", title:"Progress Dashboard", desc:"Track mastery levels across all topics for every student. See who's ahead and who needs help.", accent:"#3B82F6" },
+            { icon:"🧩", title:"AI Exercise Generator", desc:"Generate custom exercises and quizzes with one click. Set topic, difficulty, and assign to students.", accent:"#8B5CF6" },
+            { icon:"👨‍🏫", title:"One-Click Assignment", desc:"Assign targeted exercises to struggling students directly from the alerts dashboard.", accent:"#10B981" },
+          ].map((f,i)=>(
+            <div key={i} style={{ background:"rgba(15,23,42,0.6)", border:`1px solid ${f.accent}25`, borderRadius:14, padding:"24px 22px", backdropFilter:"blur(12px)", transition:"all 0.2s" }}
+              onMouseEnter={e=>{ e.currentTarget.style.transform="translateY(-4px)"; e.currentTarget.style.borderColor=`${f.accent}45`; e.currentTarget.style.boxShadow="0 12px 32px -8px rgba(0,0,0,0.4)"; }}
+              onMouseLeave={e=>{ e.currentTarget.style.transform="translateY(0)"; e.currentTarget.style.borderColor=`${f.accent}25`; e.currentTarget.style.boxShadow="none"; }}
+            >
+              <div style={{ fontSize:28, marginBottom:14 }}>{f.icon}</div>
+              <h3 style={{ fontSize:14, fontWeight:600, color:"#E2E8F0", marginBottom:8 }}>{f.title}</h3>
+              <p style={{ fontSize:12, color:"#64748B", lineHeight:1.65 }}>{f.desc}</p>
+            </div>
+          ))}
+        </div>
+        <div style={{ textAlign:"center", marginTop:36 }}>
+          <button onClick={()=>onNavigate("login")} style={{ fontSize:13, fontWeight:600, padding:"10px 28px", borderRadius:10, background:"linear-gradient(135deg,#3B82F6,#6366F1)", border:"none", color:"white", cursor:"pointer", transition:"all 0.2s" }}
+            onMouseEnter={e=>e.currentTarget.style.transform="translateY(-2px)"}
+            onMouseLeave={e=>e.currentTarget.style.transform="translateY(0)"}
+          >Get Started as a Teacher</button>
+        </div>
+      </section>
+
+      {/* ── PRICING ── */}
+      <section id="pricing" style={{ position:"relative", zIndex:10, padding:"0 20px 80px", maxWidth:1000, margin:"0 auto", scrollMarginTop:60 }}>
+        <div style={{ textAlign:"center", marginBottom:48 }}>
+          <p style={{ fontSize:10, fontWeight:700, letterSpacing:"0.12em", textTransform:"uppercase", color:"#475569", marginBottom:10 }}>Pricing</p>
+          <h2 style={{ fontSize:"clamp(1.6rem,4vw,2.4rem)", fontWeight:800, color:"white", letterSpacing:"-0.02em" }}>Start free. Upgrade when ready.</h2>
+        </div>
+        <div className="lf-pricing-grid" style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(260px,1fr))", gap:16, alignItems:"start" }}>
+          {/* Free tier */}
+          <div style={{ background:"rgba(15,23,42,0.6)", border:"1px solid rgba(148,163,184,0.1)", borderRadius:16, padding:"28px 24px", backdropFilter:"blur(12px)" }}>
+            <p style={{ fontSize:12, fontWeight:700, textTransform:"uppercase", letterSpacing:"0.08em", color:"#64748B", marginBottom:6 }}>Free</p>
+            <div style={{ display:"flex", alignItems:"baseline", gap:4, marginBottom:16 }}>
+              <span style={{ fontSize:36, fontWeight:800, color:"white" }}>$0</span>
+              <span style={{ fontSize:13, color:"#475569" }}>/month</span>
+            </div>
+            <p style={{ fontSize:12, color:"#64748B", marginBottom:20, lineHeight:1.6 }}>Perfect for getting started with Python</p>
+            <div style={{ display:"flex", flexDirection:"column", gap:10, marginBottom:24 }}>
+              {["10 AI chat messages/day","5 code executions/day","2 quizzes/day","Basic progress tracking","Community support"].map((f,i)=>(
+                <div key={i} style={{ display:"flex", alignItems:"center", gap:8, fontSize:12, color:"#94A3B8" }}>
+                  <span style={{ color:"#3B82F6", fontSize:14 }}>✓</span>{f}
+                </div>
+              ))}
+            </div>
+            <button onClick={()=>onNavigate("login")} style={{ width:"100%", fontSize:13, fontWeight:600, padding:"10px 0", borderRadius:10, background:"rgba(59,130,246,0.1)", border:"1px solid rgba(59,130,246,0.25)", color:"#93C5FD", cursor:"pointer", transition:"all 0.15s" }}
+              onMouseEnter={e=>e.currentTarget.style.background="rgba(59,130,246,0.2)"}
+              onMouseLeave={e=>e.currentTarget.style.background="rgba(59,130,246,0.1)"}
+            >Get Started Free</button>
+          </div>
+
+          {/* Pro tier */}
+          <div style={{ background:"rgba(59,130,246,0.08)", border:"1px solid rgba(59,130,246,0.3)", borderRadius:16, padding:"28px 24px", backdropFilter:"blur(12px)", position:"relative" }}>
+            <div style={{ position:"absolute", top:-10, left:"50%", transform:"translateX(-50%)", fontSize:10, fontWeight:700, textTransform:"uppercase", letterSpacing:"0.1em", padding:"4px 14px", borderRadius:99, background:"linear-gradient(135deg,#3B82F6,#6366F1)", color:"white" }}>Most Popular</div>
+            <p style={{ fontSize:12, fontWeight:700, textTransform:"uppercase", letterSpacing:"0.08em", color:"#3B82F6", marginBottom:6 }}>Pro</p>
+            <div style={{ display:"flex", alignItems:"baseline", gap:4, marginBottom:16 }}>
+              <span style={{ fontSize:36, fontWeight:800, color:"white" }}>$12</span>
+              <span style={{ fontSize:13, color:"#475569" }}>/month</span>
+            </div>
+            <p style={{ fontSize:12, color:"#64748B", marginBottom:20, lineHeight:1.6 }}>Unlimited learning for serious students</p>
+            <div style={{ display:"flex", flexDirection:"column", gap:10, marginBottom:24 }}>
+              {["Unlimited AI chat messages","Unlimited code executions","Unlimited quizzes & exercises","All 8 curriculum modules","Advanced progress analytics","Leaderboard access","Code snippets library","Priority support"].map((f,i)=>(
+                <div key={i} style={{ display:"flex", alignItems:"center", gap:8, fontSize:12, color:"#E2E8F0" }}>
+                  <span style={{ color:"#3B82F6", fontSize:14 }}>✓</span>{f}
+                </div>
+              ))}
+            </div>
+            <button onClick={()=>onNavigate("login")} style={{ width:"100%", fontSize:13, fontWeight:600, padding:"10px 0", borderRadius:10, background:"linear-gradient(135deg,#3B82F6,#6366F1)", border:"none", color:"white", cursor:"pointer", transition:"all 0.15s" }}
+              onMouseEnter={e=>e.currentTarget.style.transform="translateY(-1px)"}
+              onMouseLeave={e=>e.currentTarget.style.transform="translateY(0)"}
+            >Start Pro Trial</button>
+          </div>
+
+          {/* School tier */}
+          <div style={{ background:"rgba(15,23,42,0.6)", border:"1px solid rgba(148,163,184,0.1)", borderRadius:16, padding:"28px 24px", backdropFilter:"blur(12px)" }}>
+            <p style={{ fontSize:12, fontWeight:700, textTransform:"uppercase", letterSpacing:"0.08em", color:"#64748B", marginBottom:6 }}>School</p>
+            <div style={{ display:"flex", alignItems:"baseline", gap:4, marginBottom:16 }}>
+              <span style={{ fontSize:36, fontWeight:800, color:"white" }}>$8</span>
+              <span style={{ fontSize:13, color:"#475569" }}>/student/mo</span>
+            </div>
+            <p style={{ fontSize:12, color:"#64748B", marginBottom:20, lineHeight:1.6 }}>Built for classrooms and institutions</p>
+            <div style={{ display:"flex", flexDirection:"column", gap:10, marginBottom:24 }}>
+              {["Everything in Pro","Teacher dashboard","Real-time struggle alerts","AI exercise generator","One-click assignment","Class management","Student analytics export","Dedicated support"].map((f,i)=>(
+                <div key={i} style={{ display:"flex", alignItems:"center", gap:8, fontSize:12, color:"#94A3B8" }}>
+                  <span style={{ color:"#10B981", fontSize:14 }}>✓</span>{f}
+                </div>
+              ))}
+            </div>
+            <button onClick={()=>onNavigate("login")} style={{ width:"100%", fontSize:13, fontWeight:600, padding:"10px 0", borderRadius:10, background:"rgba(16,185,129,0.1)", border:"1px solid rgba(16,185,129,0.25)", color:"#6EE7B7", cursor:"pointer", transition:"all 0.15s" }}
+              onMouseEnter={e=>e.currentTarget.style.background="rgba(16,185,129,0.2)"}
+              onMouseLeave={e=>e.currentTarget.style.background="rgba(16,185,129,0.1)"}
+            >Contact Sales</button>
           </div>
         </div>
       </section>
@@ -321,6 +636,64 @@ function LandingPage({ onNavigate }) {
         </div>
         <p style={{ fontSize:11, color:"#334155" }}>Powered by LearnFlow AI &nbsp;•&nbsp; Built with Claude Code &amp; Goose</p>
       </footer>
+
+      {activeFeature && <FeatureModal feature={activeFeature} onClose={()=>setActiveFeature(null)}/>}
+
+      {activeModule && (
+        <div onClick={()=>setActiveModule(null)} style={{position:"fixed",inset:0,zIndex:100,background:"rgba(0,0,0,0.7)",backdropFilter:"blur(8px)",display:"flex",alignItems:"center",justifyContent:"center",padding:16,animation:"fadein 0.2s ease"}}>
+          <div onClick={e=>e.stopPropagation()} style={{background:"#0F172A",border:"1px solid rgba(59,130,246,0.2)",borderRadius:18,padding:"28px 24px",maxWidth:480,width:"100%",maxHeight:"80vh",overflowY:"auto",boxShadow:"0 24px 64px -16px rgba(0,0,0,0.6)"}}>
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:20}}>
+              <div style={{display:"flex",alignItems:"center",gap:12}}>
+                <div style={{width:40,height:40,borderRadius:10,background:"rgba(59,130,246,0.12)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,fontWeight:800,fontFamily:"monospace",color:"#60A5FA"}}>{activeModule.n}</div>
+                <div>
+                  <div style={{fontSize:16,fontWeight:700,color:"#F1F5F9"}}>{activeModule.label}</div>
+                  <div style={{fontSize:11,color:"#64748B"}}>{activeModule.sub}</div>
+                </div>
+              </div>
+              <button onClick={()=>setActiveModule(null)} style={{width:30,height:30,borderRadius:8,border:"1px solid rgba(148,163,184,0.1)",background:"rgba(30,41,59,0.6)",color:"#94A3B8",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontSize:16}}>x</button>
+            </div>
+
+            {/* Stats row */}
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(70px,1fr))",gap:6,marginBottom:16}}>
+              {[{v:activeModule.lessons,l:"Lessons",c:"#3B82F6"},{v:activeModule.quizzes,l:"Quizzes",c:"#8B5CF6"},{v:activeModule.exercises,l:"Exercises",c:"#10B981"},{v:activeModule.time,l:"Est. Time",c:"#F59E0B"}].map(s=>(
+                <div key={s.l} style={{background:"rgba(30,41,59,0.5)",borderRadius:8,padding:"10px 8px",textAlign:"center"}}>
+                  <div style={{fontSize:16,fontWeight:800,color:s.c}}>{s.v}</div>
+                  <div style={{fontSize:9,fontWeight:600,color:"#64748B",textTransform:"uppercase",marginTop:2}}>{s.l}</div>
+                </div>
+              ))}
+            </div>
+
+            {/* Topics */}
+            <div style={{marginBottom:16}}>
+              <div style={{fontSize:12,fontWeight:700,color:"#E2E8F0",marginBottom:8}}>Topics Covered</div>
+              <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+                {activeModule.topics.map(t=>(
+                  <span key={t} style={{fontSize:11,fontWeight:500,padding:"4px 10px",borderRadius:99,background:"rgba(59,130,246,0.08)",border:"1px solid rgba(59,130,246,0.15)",color:"#93C5FD"}}>{t}</span>
+                ))}
+              </div>
+            </div>
+
+            {/* Projects */}
+            <div style={{marginBottom:16}}>
+              <div style={{fontSize:12,fontWeight:700,color:"#E2E8F0",marginBottom:8}}>Hands-On Projects</div>
+              <div style={{display:"grid",gap:6}}>
+                {activeModule.projects.map(p=>(
+                  <div key={p} style={{display:"flex",alignItems:"center",gap:8,background:"rgba(30,41,59,0.5)",border:"1px solid rgba(148,163,184,0.07)",borderRadius:8,padding:"10px 12px"}}>
+                    <span style={{fontSize:14}}>🛠️</span>
+                    <span style={{fontSize:12,fontWeight:600,color:"#E2E8F0"}}>{p}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* CTA */}
+            <button onClick={()=>{setActiveModule(null);onNavigate("login");}} style={{width:"100%",padding:"11px",borderRadius:10,border:"none",background:"linear-gradient(135deg,#1D4ED8,#2563EB)",color:"white",fontWeight:600,fontSize:13,cursor:"pointer",transition:"opacity 0.15s"}}
+              onMouseEnter={e=>e.currentTarget.style.opacity="0.9"} onMouseLeave={e=>e.currentTarget.style.opacity="1"}>
+              Start Learning {activeModule.label}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -481,34 +854,39 @@ function LoginPage({ onLogin, onDemoLogin, onBack }) {
 // SIDEBAR
 // ══════════════════════════════════════════════════════════════════════════════
 const NAV_ITEMS = [
-  { id:"dashboard", label:"Dashboard", emoji:"⊞" },
-  { id:"progress",  label:"Progress",  emoji:"📈" },
-  { id:"settings",  label:"Settings",  emoji:"⚙️" },
+  { id:"dashboard",    label:"Dashboard",    emoji:"⊞" },
+  { id:"learn",        label:"Learn",        emoji:"📚", studentOnly:true },
+  { id:"snippets",     label:"Snippets",     emoji:"📌", studentOnly:true },
+  { id:"history",      label:"Chat History", emoji:"🗂️", studentOnly:true },
+  { id:"teachers",     label:"Teachers",     emoji:"👨‍🏫", studentOnly:true },
+  { id:"leaderboard",  label:"Leaderboard",  emoji:"🏆" },
+  { id:"progress",     label:"Progress",     emoji:"📈" },
+  { id:"settings",     label:"Settings",     emoji:"⚙️" },
 ];
-function Sidebar({ expanded, setExpanded, activePage, setActivePage, role, onLogout, isMobile, onClose }) {
+function Sidebar({ expanded, setExpanded, activePage, setActivePage, role, user, onLogout, isMobile, onClose, theme }) {
   const accent = role==="teacher"?"#10B981":"#3B82F6";
   const grad   = role==="teacher"?"linear-gradient(135deg,#10B981,#059669)":"linear-gradient(135deg,#3B82F6,#6366F1)";
   return (
     <>
       {isMobile && expanded && <div onClick={onClose} style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.6)", zIndex:25, backdropFilter:"blur(2px)" }}/>}
-      <div style={{ position:isMobile?"fixed":"relative", top:0, left:isMobile?(expanded?0:-240):"auto", height:isMobile?"100vh":"100%", width:isMobile?220:(expanded?210:56), background:"rgba(13,20,36,0.99)", borderRight:"1px solid rgba(148,163,184,0.08)", display:"flex", flexDirection:"column", transition:isMobile?"left 0.25s cubic-bezier(.4,0,.2,1)":"width 0.25s cubic-bezier(.4,0,.2,1)", overflow:"hidden", flexShrink:0, zIndex:30 }}>
-        <div style={{ height:50, display:"flex", alignItems:"center", padding:"0 13px", borderBottom:"1px solid rgba(148,163,184,0.07)", gap:8, flexShrink:0 }}>
+      <div style={{ position:isMobile?"fixed":"relative", top:0, left:isMobile?(expanded?0:-240):"auto", height:isMobile?"100vh":"100%", width:isMobile?220:(expanded?210:56), background:"var(--lf-sidebar)", borderRight:"1px solid var(--lf-border)", display:"flex", flexDirection:"column", transition:isMobile?"left 0.25s cubic-bezier(.4,0,.2,1)":"width 0.25s cubic-bezier(.4,0,.2,1), background 0.3s", overflow:"hidden", flexShrink:0, zIndex:30 }}>
+        <div style={{ height:50, display:"flex", alignItems:"center", padding:"0 13px", borderBottom:"1px solid var(--lf-border)", gap:8, flexShrink:0 }}>
           <div style={{ width:26, height:26, borderRadius:7, background:grad, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
             <svg viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" style={{width:12,height:12}}><path strokeLinecap="round" strokeLinejoin="round" d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
           </div>
-          {(expanded||isMobile) && <span style={{ fontSize:14, fontWeight:700, color:"#F1F5F9", whiteSpace:"nowrap" }}>LearnFlow</span>}
+          {(expanded||isMobile) && <span style={{ fontSize:14, fontWeight:700, color:"var(--lf-text)", whiteSpace:"nowrap" }}>LearnFlow</span>}
         </div>
         {(expanded||isMobile) && (
-          <div style={{ margin:"10px 8px 4px", padding:"9px 11px", background:"rgba(30,41,59,0.5)", border:"1px solid rgba(148,163,184,0.07)", borderRadius:10, display:"flex", alignItems:"center", gap:8 }}>
-            <div style={{ width:26, height:26, borderRadius:"50%", background:grad, display:"flex", alignItems:"center", justifyContent:"center", fontSize:10, fontWeight:700, color:"white", flexShrink:0 }}>{role==="teacher"?"R":"M"}</div>
+          <div style={{ margin:"10px 8px 4px", padding:"9px 11px", background:"var(--lf-surface2)", border:"1px solid var(--lf-border)", borderRadius:10, display:"flex", alignItems:"center", gap:8 }}>
+            <div style={{ width:26, height:26, borderRadius:"50%", background:grad, display:"flex", alignItems:"center", justifyContent:"center", fontSize:10, fontWeight:700, color:"white", flexShrink:0 }}>{user?.name?user.name.split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase():role==="teacher"?"T":"S"}</div>
             <div style={{ minWidth:0 }}>
-              <div style={{ fontSize:12, fontWeight:600, color:"#E2E8F0", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{role==="teacher"?"Mr. Rodriguez":"Maya Chen"}</div>
+              <div style={{ fontSize:12, fontWeight:600, color:"var(--lf-text2)", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{user?.name||"User"}</div>
               <div style={{ fontSize:10, color:accent, fontWeight:500, textTransform:"capitalize" }}>{role}</div>
             </div>
           </div>
         )}
         <nav style={{ flex:1, padding:"8px", display:"flex", flexDirection:"column", gap:2 }}>
-          {NAV_ITEMS.map(n=>{
+          {NAV_ITEMS.filter(n=>!n.studentOnly||role==="student").map(n=>{
             const active=activePage===n.id;
             return <button key={n.id} onClick={()=>{ setActivePage(n.id); if(isMobile) onClose(); }} style={{ display:"flex", alignItems:"center", gap:9, padding:(expanded||isMobile)?"8px 11px":"8px", justifyContent:(expanded||isMobile)?"flex-start":"center", borderRadius:8, border:"none", cursor:"pointer", background:active?`${accent}15`:"transparent", color:active?accent:"#64748B", fontWeight:active?600:400, fontSize:13, transition:"all 0.15s", width:"100%", position:"relative" }}
               onMouseEnter={e=>{ if(!active){ e.currentTarget.style.background="rgba(148,163,184,0.06)"; e.currentTarget.style.color="#94A3B8"; }}}
@@ -545,10 +923,12 @@ function Sidebar({ expanded, setExpanded, activePage, setActivePage, role, onLog
 // ══════════════════════════════════════════════════════════════════════════════
 // STUDENT DASHBOARD
 // ══════════════════════════════════════════════════════════════════════════════
-function StudentDashboard({ user }) {
+function StudentDashboard({ user, snippetCode, clearSnippetCode, onSignup }) {
   const isDemo = !user || user.id === 0;
   const token = typeof window !== "undefined" ? localStorage.getItem("lf_token") : null;
   const authHeaders = token ? { Authorization: `Bearer ${token}` } : {};
+  const limiter = useLimits(user);
+  const [upgradeModal, setUpgradeModal] = useState(null); // action string or null
   const [tab, setTab]           = useLocalStorage("lf_student_tab","chat");
   const [msgs, setMsgs]         = useState(isDemo ? INIT_MSGS : []);
   const [input, setInput]       = useState("");
@@ -560,8 +940,14 @@ function StudentDashboard({ user }) {
   const [execStats, setExecStats] = useState({ total: 0, successes: 0, streak: 0, active_days: 0 });
   const [dataLoading, setDataLoading] = useState(!isDemo);
   const [toast, setToast] = useState(null);
+  const [expandedTopic, setExpandedTopic] = useState(null);
   const chatEnd = useRef(null);
   useEffect(()=>{ chatEnd.current?.scrollIntoView({behavior:"smooth"}); },[msgs,typing]);
+
+  // Handle snippet loaded from SnippetsPage
+  useEffect(()=>{
+    if(snippetCode){setCode(snippetCode);setTab("code");clearSnippetCode();}
+  },[snippetCode]);
 
   // Load real data on mount
   useEffect(()=>{
@@ -586,6 +972,7 @@ function StudentDashboard({ user }) {
 
   const send = () => {
     const t=input.trim(); if(!t) return;
+    if(!limiter.consume("chat")){ setUpgradeModal("chat"); return; }
     setMsgs(p=>[...p,{id:Date.now(),role:"user",text:t}]);
     setInput(""); setTyping(true);
     // Save user message to DB
@@ -622,16 +1009,74 @@ function StudentDashboard({ user }) {
   const [exResult,setExResult]=useState(null);
   const [genQuizTopic,setGenQuizTopic]=useState("");
   const [genQuizLoading,setGenQuizLoading]=useState(false);
+  const [snippetModal,setSnippetModal]=useState(false);
+  const [snippetTitle,setSnippetTitle]=useState("");
+  const [snippetDesc,setSnippetDesc]=useState("");
+  const [snippetTags,setSnippetTags]=useState("");
+  const [snippetSaving,setSnippetSaving]=useState(false);
+  const [reviews,setReviews]=useState([]);
+  const [unseenReviews,setUnseenReviews]=useState(0);
+  const [expandedReview,setExpandedReview]=useState(null);
+  const [notifications,setNotifications]=useState([]);
+  const [unseenNotifs,setUnseenNotifs]=useState(0);
 
-  // Load assignments + quizzes
+  const saveSnippet=async()=>{
+    if(!snippetTitle.trim()||!code.trim()){setToast({message:"Title and code are required",type:"error"});return;}
+    if(!limiter.consume("snippets_save")){setUpgradeModal("snippets_save");return;}
+    setSnippetSaving(true);
+    try{
+      const res=await fetch("/api/snippets",{method:"POST",headers:{"Content-Type":"application/json",...authHeaders},body:JSON.stringify({title:snippetTitle,description:snippetDesc,code,tags:snippetTags})});
+      if(!res.ok)throw new Error("Failed to save");
+      setToast({message:`Snippet "${snippetTitle}" saved!`,type:"success"});
+      setSnippetModal(false);setSnippetTitle("");setSnippetDesc("");setSnippetTags("");
+    }catch(e){setToast({message:e.message||"Save failed",type:"error"});}
+    setSnippetSaving(false);
+  };
+
+  // Voice input (Web Speech API)
+  const [listening, setListening] = useState(false);
+  const recognitionRef = useRef(null);
+
+  const toggleVoice = () => {
+    if (listening) {
+      if (recognitionRef.current) recognitionRef.current.stop();
+      setListening(false);
+      return;
+    }
+    const SR = typeof window !== "undefined" && (window.SpeechRecognition || window.webkitSpeechRecognition);
+    if (!SR) { setToast({message:"Voice input not supported in this browser. Try Chrome or Edge.",type:"error"}); return; }
+    const rec = new SR();
+    rec.lang = "en-US";
+    rec.interimResults = true;
+    rec.continuous = true;
+    rec.onresult = (e) => {
+      let transcript = "";
+      for (let i = 0; i < e.results.length; i++) transcript += e.results[i][0].transcript;
+      setInput(transcript);
+    };
+    rec.onerror = (e) => {
+      if (e.error === "not-allowed") setToast({message:"Microphone access denied. Please allow mic access.",type:"error"});
+      else if (e.error !== "aborted") setToast({message:`Voice error: ${e.error}`,type:"error"});
+      setListening(false);
+    };
+    rec.onend = () => setListening(false);
+    recognitionRef.current = rec;
+    rec.start();
+    setListening(true);
+  };
+
+  // Load assignments + quizzes + reviews
   useEffect(()=>{
     if(isDemo) return;
     fetch("/api/teacher/assign",{headers:authHeaders}).then(r=>r.ok?r.json():null).then(d=>{if(d&&d.exercises)setAssignments(d.exercises);}).catch(()=>{});
     fetch("/api/quizzes",{headers:authHeaders}).then(r=>r.ok?r.json():null).then(d=>{if(d&&d.quizzes)setQuizzes(d.quizzes);}).catch(()=>{});
+    fetch("/api/reviews",{headers:authHeaders}).then(r=>r.ok?r.json():null).then(d=>{if(d){setReviews(d.reviews||[]);setUnseenReviews(d.unseen_count||0);}}).catch(()=>{});
+    fetch("/api/notifications",{headers:authHeaders}).then(r=>r.ok?r.json():null).then(d=>{if(d){setNotifications(d.notifications||[]);setUnseenNotifs(d.unseen_count||0);}}).catch(()=>{});
   },[]);
 
   const submitQuiz=async()=>{
     if(!activeQuiz||submittingQuiz)return;
+    if(!limiter.consume("quiz")){setUpgradeModal("quiz");return;}
     setSubmittingQuiz(true);
     try {
       const res=await fetch("/api/quizzes/submit",{method:"POST",headers:{"Content-Type":"application/json",...authHeaders},body:JSON.stringify({quiz_id:activeQuiz.quiz_id,answers:quizAnswers})});
@@ -646,6 +1091,7 @@ function StudentDashboard({ user }) {
 
   const submitExercise=async()=>{
     if(!activeExercise||exSubmitting)return;
+    if(!limiter.consume("exercise_grade")){setUpgradeModal("exercise_grade");return;}
     setExSubmitting(true);
     try {
       const res=await fetch("/api/exercises/submit",{method:"POST",headers:{"Content-Type":"application/json",...authHeaders},body:JSON.stringify({exercise_id:activeExercise.id,code:exCode})});
@@ -659,11 +1105,22 @@ function StudentDashboard({ user }) {
     setExSubmitting(false);
   };
 
+  const getAdaptiveQuizParams=(topicName)=>{
+    const t=topics.find(x=>x.name===topicName);
+    const pct=t?t.pct:0;
+    if(pct>=91) return {difficulty:"advanced",num_questions:Math.floor(Math.random()*4)+12,level:"Mastered"};
+    if(pct>=71) return {difficulty:"advanced",num_questions:10,level:"Proficient"};
+    if(pct>=41) return {difficulty:"intermediate",num_questions:8,level:"Learning"};
+    return {difficulty:"beginner",num_questions:5,level:"Beginner"};
+  };
+
   const generateQuiz=async()=>{
     if(!genQuizTopic||genQuizLoading)return;
+    if(!limiter.consume("generate_quiz")){setUpgradeModal("generate_quiz");return;}
     setGenQuizLoading(true);
+    const params=getAdaptiveQuizParams(genQuizTopic);
     try {
-      const res=await fetch("/api/quizzes/generate",{method:"POST",headers:{"Content-Type":"application/json",...authHeaders},body:JSON.stringify({topic:genQuizTopic,difficulty:"beginner",num_questions:5})});
+      const res=await fetch("/api/quizzes/generate",{method:"POST",headers:{"Content-Type":"application/json",...authHeaders},body:JSON.stringify({topic:genQuizTopic,difficulty:params.difficulty,num_questions:params.num_questions})});
       if(!res.ok)throw new Error("Failed to generate quiz");
       const data=await res.json();
       if(data.quiz_id&&data.questions){
@@ -702,8 +1159,21 @@ function StudentDashboard({ user }) {
   return (
     <div style={{display:"flex",flexDirection:"column",height:"100%",overflow:"hidden"}}>
       {toast&&<Toast message={toast.message} type={toast.type} onClose={()=>setToast(null)}/>}
+      {upgradeModal&&<UpgradeModal action={upgradeModal} tierInfo={limiter} onClose={()=>setUpgradeModal(null)} onSignup={onSignup||(()=>{})}/>}
+      {/* Usage indicator bar */}
+      {limiter.tier!=="pro"&&(
+        <div style={{display:"flex",alignItems:"center",gap:12,padding:"6px 14px",background:limiter.isDemo?"rgba(251,191,36,0.06)":"rgba(59,130,246,0.06)",borderBottom:"1px solid "+(limiter.isDemo?"rgba(251,191,36,0.12)":"rgba(59,130,246,0.12)"),flexShrink:0,overflowX:"auto"}}>
+          <span style={{fontSize:10,fontWeight:700,color:limiter.isDemo?"#FBBF24":"#3B82F6",textTransform:"uppercase",letterSpacing:"0.08em",flexShrink:0}}>{limiter.isDemo?"Demo":"Free"}</span>
+          {["chat","execute","quiz"].map(a=>{const s=limiter.check(a);return(
+            <div key={a} style={{display:"flex",alignItems:"center",gap:4,flexShrink:0}}>
+              <span style={{fontSize:10,color:"#64748B"}}>{LIMIT_LABELS[a]?.split(" ")[0]}:</span>
+              <span style={{fontSize:10,fontWeight:600,color:s.remaining===0?"#FB7185":s.remaining<=1?"#FBBF24":"#94A3B8"}}>{s.remaining}/{s.limit}</span>
+            </div>
+          );})}
+        </div>
+      )}
       <div style={{display:"flex",alignItems:"center",background:"rgba(15,23,42,0.7)",borderBottom:"1px solid rgba(148,163,184,0.07)",flexShrink:0,padding:"0 4px",overflowX:"auto",WebkitOverflowScrolling:"touch"}}>
-        {TABS.map(t=>{const active=tab===t.id;return <button key={t.id} onClick={()=>setTab(t.id)} style={{display:"flex",alignItems:"center",gap:6,padding:"0 12px",height:42,border:"none",borderBottom:active?"2px solid #3B82F6":"2px solid transparent",cursor:"pointer",fontSize:13,fontWeight:active?600:400,color:active?"#93C5FD":"#64748B",background:"transparent",transition:"all 0.15s",whiteSpace:"nowrap",flexShrink:0}}><span>{t.icon}</span>{t.label}</button>;})}
+        {TABS.map(t=>{const active=tab===t.id;return <button key={t.id} onClick={()=>setTab(t.id)} style={{display:"flex",alignItems:"center",gap:6,padding:"0 12px",height:42,border:"none",borderBottom:active?"2px solid #3B82F6":"2px solid transparent",cursor:"pointer",fontSize:13,fontWeight:active?600:400,color:active?"#93C5FD":"#64748B",background:"transparent",transition:"all 0.15s",whiteSpace:"nowrap",flexShrink:0,position:"relative"}}><span>{t.icon}</span>{t.label}{t.id==="exercises"&&(unseenReviews+unseenNotifs)>0&&<span style={{width:16,height:16,borderRadius:"50%",background:"#8B5CF6",color:"white",fontSize:9,fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center",marginLeft:2}}>{unseenReviews+unseenNotifs}</span>}</button>;})}
         <div style={{marginLeft:"auto",display:"flex",alignItems:"center",gap:5,padding:"0 12px",flexShrink:0}}>
           <div style={{width:48,height:3,borderRadius:99,background:"rgba(148,163,184,0.1)",overflow:"hidden"}}><div style={{height:"100%",width:`${avgMastery}%`,borderRadius:99,background:"linear-gradient(90deg,#3B82F6,#818CF8)"}}/></div>
           <span style={{fontSize:11,fontWeight:700,color:"#60A5FA"}}>{avgMastery}%</span>
@@ -723,7 +1193,11 @@ function StudentDashboard({ user }) {
               <div style={{flex:1,background:"rgba(30,41,59,0.9)",border:"1px solid rgba(148,163,184,0.1)",borderRadius:12,padding:"9px 12px"}}>
                 <textarea value={input} onChange={e=>setInput(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();send();}}} placeholder="Ask anything about Python…" rows={1} style={{width:"100%",resize:"none",fontSize:14,background:"transparent",border:"none",color:"#E2E8F0",lineHeight:1.55,maxHeight:80,fontFamily:"inherit"}}/>
               </div>
-              <button onClick={send} style={{width:38,height:38,borderRadius:10,flexShrink:0,background:input.trim()?"linear-gradient(135deg,#2563EB,#3B82F6)":"rgba(30,41,59,0.8)",border:input.trim()?"none":"1px solid rgba(148,163,184,0.1)",cursor:input.trim()?"pointer":"default",display:"flex",alignItems:"center",justifyContent:"center",color:input.trim()?"white":"#334155",transition:"all 0.18s"}}>
+              <button onClick={toggleVoice} title={listening?"Stop listening":"Voice input"} style={{width:38,height:38,borderRadius:10,flexShrink:0,background:listening?"rgba(244,63,94,0.15)":"rgba(30,41,59,0.8)",border:listening?"1px solid rgba(244,63,94,0.3)":"1px solid rgba(148,163,184,0.1)",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",color:listening?"#FB7185":"#64748B",transition:"all 0.18s",position:"relative"}}>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{width:15,height:15}}><path strokeLinecap="round" strokeLinejoin="round" d="M12 18.75a6 6 0 006-6v-1.5m-6 7.5a6 6 0 01-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 01-3-3V4.5a3 3 0 116 0v8.25a3 3 0 01-3 3z"/></svg>
+                {listening&&<span style={{position:"absolute",inset:-3,borderRadius:12,border:"2px solid rgba(244,63,94,0.4)",animation:"pulse2 1.5s ease-in-out infinite"}}/>}
+              </button>
+              <button onClick={()=>{if(listening&&recognitionRef.current){recognitionRef.current.stop();setListening(false);}send();}} style={{width:38,height:38,borderRadius:10,flexShrink:0,background:input.trim()?"linear-gradient(135deg,#2563EB,#3B82F6)":"rgba(30,41,59,0.8)",border:input.trim()?"none":"1px solid rgba(148,163,184,0.1)",cursor:input.trim()?"pointer":"default",display:"flex",alignItems:"center",justifyContent:"center",color:input.trim()?"white":"#334155",transition:"all 0.18s"}}>
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" style={{width:14,height:14}}><path strokeLinecap="round" strokeLinejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5"/></svg>
               </button>
             </div>
@@ -744,17 +1218,54 @@ function StudentDashboard({ user }) {
             <textarea value={code} onChange={e=>setCode(e.target.value)} spellCheck={false} style={{flex:1,background:"transparent",border:"none",color:"#ABB2BF",fontFamily:"'Fira Code',monospace",fontSize:12,lineHeight:"22px",padding:"10px 12px 10px 0",resize:"none",outline:"none",tabSize:4,whiteSpace:"pre",overflowX:"auto"}} onKeyDown={e=>{if(e.key==="Tab"){e.preventDefault();const s=e.target.selectionStart;const end=e.target.selectionEnd;setCode(code.substring(0,s)+"    "+code.substring(end));setTimeout(()=>{e.target.selectionStart=e.target.selectionEnd=s+4;},0);}}}/>
           </div>
           <div style={{display:"flex",alignItems:"center",gap:8,padding:"9px 13px",borderTop:"1px solid rgba(148,163,184,0.07)",background:"rgba(15,23,42,0.7)",flexShrink:0}}>
-            <button onClick={()=>{setRunState("running");setOutput("");fetch("/api/execute",{method:"POST",headers:{"Content-Type":"application/json",...authHeaders},body:JSON.stringify({code})}).then(r=>{if(!r.ok)throw new Error("Execution service unavailable");return r.json();}).then(d=>{setRunState("done");setOutput(d.output||d.error||"(no output)");if(!isDemo)fetch("/api/submissions",{headers:authHeaders}).then(r=>r.ok?r.json():null).then(s=>{if(s&&s.stats)setExecStats(s.stats);}).catch(()=>{});if(!isDemo)fetch("/api/progress",{headers:authHeaders}).then(r=>r.ok?r.json():null).then(s=>{if(s)setTopics(s.topics);}).catch(()=>{});}).catch(e=>{setRunState("done");setOutput("Error: "+(e.message||"could not execute code"));setToast({message:"Code execution failed: "+(e.message||"unknown error"),type:"error"});});}} style={{display:"flex",alignItems:"center",gap:5,padding:"7px 13px",borderRadius:8,border:"none",background:runState==="running"?"rgba(16,185,129,0.12)":"linear-gradient(135deg,#059669,#10B981)",color:runState==="running"?"#34D399":"white",fontSize:13,fontWeight:600,cursor:"pointer",transition:"all 0.18s"}}>
+            <button onClick={()=>{if(!limiter.consume("execute")){setUpgradeModal("execute");return;}setRunState("running");setOutput("");fetch("/api/execute",{method:"POST",headers:{"Content-Type":"application/json",...authHeaders},body:JSON.stringify({code})}).then(r=>{if(!r.ok)throw new Error("Execution service unavailable");return r.json();}).then(d=>{setRunState("done");setOutput(d.output||d.error||"(no output)");if(!isDemo)fetch("/api/submissions",{headers:authHeaders}).then(r=>r.ok?r.json():null).then(s=>{if(s&&s.stats)setExecStats(s.stats);}).catch(()=>{});if(!isDemo)fetch("/api/progress",{headers:authHeaders}).then(r=>r.ok?r.json():null).then(s=>{if(s)setTopics(s.topics);}).catch(()=>{});}).catch(e=>{setRunState("done");setOutput("Error: "+(e.message||"could not execute code"));setToast({message:"Code execution failed: "+(e.message||"unknown error"),type:"error"});});}} style={{display:"flex",alignItems:"center",gap:5,padding:"7px 13px",borderRadius:8,border:"none",background:runState==="running"?"rgba(16,185,129,0.12)":"linear-gradient(135deg,#059669,#10B981)",color:runState==="running"?"#34D399":"white",fontSize:13,fontWeight:600,cursor:"pointer",transition:"all 0.18s"}}>
               <svg viewBox="0 0 24 24" fill="currentColor" style={{width:11,height:11}}><path fillRule="evenodd" d="M4.5 5.653c0-1.426 1.529-2.33 2.779-1.643l11.54 6.348c1.295.712 1.295 2.573 0 3.285L7.28 19.991c-1.25.687-2.779-.217-2.779-1.643V5.653z" clipRule="evenodd"/></svg>
               {runState==="running"?"Running…":"▶ Run"}
             </button>
             <button onClick={()=>{setOutput("");setRunState("ready");}} style={{padding:"7px 11px",borderRadius:8,background:"rgba(30,41,59,0.8)",border:"1px solid rgba(148,163,184,0.1)",color:"#94A3B8",fontSize:13,cursor:"pointer"}}>Clear</button>
+            <button onClick={()=>setSnippetModal(true)} style={{padding:"7px 11px",borderRadius:8,background:"rgba(139,92,246,0.1)",border:"1px solid rgba(139,92,246,0.2)",color:"#A78BFA",fontSize:12,fontWeight:600,cursor:"pointer",display:"flex",alignItems:"center",gap:4}}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{width:11,height:11}}><path strokeLinecap="round" strokeLinejoin="round" d="M17.593 3.322c1.1.128 1.907 1.077 1.907 2.185V21L12 17.25 4.5 21V5.507c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0111.186 0z"/></svg>
+              Save
+            </button>
             <span style={{marginLeft:"auto",fontSize:11,color:runState==="ready"?"#334155":runState==="running"?"#F59E0B":"#34D399"}}>{runState==="ready"?"● Ready":runState==="running"?"● Running...":"● Done"}</span>
           </div>
           <div style={{height:120,background:"#0D1117",borderTop:"1px solid rgba(148,163,184,0.07)",flexShrink:0,padding:"10px 13px",overflowY:"auto"}}>
             {!output&&runState==="ready"&&<span style={{fontFamily:"monospace",fontSize:12,color:"#3E4451"}}>$ _</span>}
             {runState==="running"&&<span style={{fontFamily:"monospace",fontSize:12,color:"#F59E0B"}}>Running…</span>}
             {output&&<pre style={{fontFamily:"monospace",fontSize:13,lineHeight:1.7,color:"#E2E8F0",whiteSpace:"pre-wrap"}}><span style={{color:"#475569"}}>{"$ python main.py\n"}</span>{output}{"\n"}{output.startsWith("Error")||output.includes("Traceback")?<span style={{color:"#FB7185"}}>✗ Error</span>:<span style={{color:"#34D399"}}>✓ Success</span>}</pre>}
+          </div>
+        </div>
+      )}
+      {/* Save Snippet Modal */}
+      {snippetModal&&(
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.6)",zIndex:50,display:"flex",alignItems:"center",justifyContent:"center",padding:20,backdropFilter:"blur(2px)"}} onClick={()=>setSnippetModal(false)}>
+          <div onClick={e=>e.stopPropagation()} style={{background:"#1E293B",border:"1px solid rgba(148,163,184,0.15)",borderRadius:16,padding:"24px",width:"100%",maxWidth:420,animation:"fadein 0.2s ease"}}>
+            <div style={{fontSize:16,fontWeight:700,color:"#F1F5F9",marginBottom:4}}>Save Code Snippet</div>
+            <div style={{fontSize:12,color:"#64748B",marginBottom:18}}>Save this code to your snippets library for quick reuse</div>
+            <div style={{display:"grid",gap:12}}>
+              <div>
+                <label style={{fontSize:11,fontWeight:600,color:"#94A3B8",marginBottom:4,display:"block"}}>Title *</label>
+                <input value={snippetTitle} onChange={e=>setSnippetTitle(e.target.value)} placeholder="e.g. My Fibonacci Function" style={{width:"100%",padding:"10px 12px",background:"rgba(15,23,42,0.5)",border:"1px solid rgba(148,163,184,0.12)",borderRadius:8,fontSize:12,color:"#E2E8F0",outline:"none"}}/>
+              </div>
+              <div>
+                <label style={{fontSize:11,fontWeight:600,color:"#94A3B8",marginBottom:4,display:"block"}}>Description</label>
+                <input value={snippetDesc} onChange={e=>setSnippetDesc(e.target.value)} placeholder="Brief description of what this code does" style={{width:"100%",padding:"10px 12px",background:"rgba(15,23,42,0.5)",border:"1px solid rgba(148,163,184,0.12)",borderRadius:8,fontSize:12,color:"#E2E8F0",outline:"none"}}/>
+              </div>
+              <div>
+                <label style={{fontSize:11,fontWeight:600,color:"#94A3B8",marginBottom:4,display:"block"}}>Tags (comma-separated)</label>
+                <input value={snippetTags} onChange={e=>setSnippetTags(e.target.value)} placeholder="e.g. functions, recursion, math" style={{width:"100%",padding:"10px 12px",background:"rgba(15,23,42,0.5)",border:"1px solid rgba(148,163,184,0.12)",borderRadius:8,fontSize:12,color:"#E2E8F0",outline:"none"}}/>
+              </div>
+              <div>
+                <label style={{fontSize:11,fontWeight:600,color:"#94A3B8",marginBottom:4,display:"block"}}>Code Preview</label>
+                <pre style={{padding:"10px 12px",background:"rgba(15,23,42,0.7)",border:"1px solid rgba(148,163,184,0.08)",borderRadius:8,fontSize:11,color:"#93C5FD",fontFamily:"monospace",maxHeight:100,overflow:"auto",lineHeight:1.5}}>{code.length>500?code.slice(0,500)+"...":code}</pre>
+              </div>
+            </div>
+            <div style={{display:"flex",gap:10,marginTop:18}}>
+              <button onClick={()=>setSnippetModal(false)} style={{flex:1,padding:"10px",borderRadius:8,border:"1px solid rgba(148,163,184,0.15)",background:"transparent",color:"#94A3B8",fontSize:13,fontWeight:600,cursor:"pointer"}}>Cancel</button>
+              <button onClick={saveSnippet} disabled={snippetSaving||!snippetTitle.trim()} style={{flex:2,padding:"10px",borderRadius:8,border:"none",background:snippetTitle.trim()?"linear-gradient(135deg,#7C3AED,#8B5CF6)":"rgba(148,163,184,0.1)",color:snippetTitle.trim()?"white":"#475569",fontSize:13,fontWeight:700,cursor:snippetTitle.trim()?"pointer":"not-allowed",opacity:snippetSaving?0.6:1}}>
+                {snippetSaving?"Saving...":"Save Snippet"}
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -811,7 +1322,7 @@ function StudentDashboard({ user }) {
             {activeExercise&&(
               <div style={{background:"rgba(30,41,59,0.4)",border:"1px solid rgba(59,130,246,0.15)",borderRadius:14,overflow:"hidden"}}>
                 <div style={{padding:"13px 15px",borderBottom:"1px solid rgba(148,163,184,0.06)",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-                  <div><div style={{fontSize:14,fontWeight:700,color:"#F1F5F9"}}>{activeExercise.title}</div><div style={{fontSize:11,color:"#64748B"}}>{activeExercise.topic} — {activeExercise.difficulty}</div></div>
+                  <div><div style={{fontSize:14,fontWeight:700,color:"#F1F5F9"}}>{activeExercise.title}</div><div style={{fontSize:11,color:"#64748B"}}>{activeExercise.topic} — {activeExercise.difficulty}{activeExercise.teacher_name?` · by ${activeExercise.teacher_name}`:""}</div></div>
                   <button onClick={()=>{setActiveExercise(null);setExCode("");setExResult(null);}} style={{fontSize:11,color:"#64748B",background:"transparent",border:"none",cursor:"pointer"}}>Close</button>
                 </div>
                 {activeExercise.description&&<div style={{padding:"10px 15px",fontSize:12,color:"#94A3B8",borderBottom:"1px solid rgba(148,163,184,0.04)"}}>{activeExercise.description}</div>}
@@ -848,6 +1359,15 @@ function StudentDashboard({ user }) {
                     {genQuizLoading?"Generating...":"Generate Quiz"}
                   </button>
                 </div>
+                {genQuizTopic&&(()=>{const p=getAdaptiveQuizParams(genQuizTopic);const lc=p.level==="Mastered"?"#3B82F6":p.level==="Proficient"?"#10B981":p.level==="Learning"?"#FBBF24":"#F43F5E";return(
+                  <div style={{marginTop:8,display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
+                    <span style={{fontSize:10,fontWeight:600,padding:"2px 8px",borderRadius:99,background:`${lc}15`,color:lc}}>{p.level}</span>
+                    <span style={{fontSize:10,color:"#64748B"}}>{p.num_questions} questions</span>
+                    <span style={{fontSize:10,color:"#475569"}}>•</span>
+                    <span style={{fontSize:10,color:"#64748B"}}>{p.difficulty} difficulty</span>
+                    <span style={{fontSize:10,color:"#475569"}}>•</span>
+                    <span style={{fontSize:10,color:"#475569",fontStyle:"italic"}}>Adapts to your mastery level</span>
+                  </div>);})()}
                 {quizzes.length>0&&<div style={{marginTop:12}}>
                   <div style={{fontSize:11,color:"#475569",marginBottom:6}}>Previous Quizzes:</div>
                   {quizzes.slice(0,5).map(q=>(
@@ -879,9 +1399,91 @@ function StudentDashboard({ user }) {
                       <div style={{flex:1,minWidth:0}}>
                         <div style={{fontSize:13,fontWeight:500,color:"#E2E8F0"}}>{ex.title}</div>
                         <div style={{fontSize:10,color:"#475569"}}>{ex.topic} — {ex.difficulty}{ex.grade!=null?` — Grade: ${ex.grade}/100`:""}</div>
+                        {ex.teacher_name&&<div style={{fontSize:10,color:"#A78BFA",marginTop:1}}>Assigned by {ex.teacher_name}</div>}
                       </div>
                       {done?<span style={{fontSize:10,fontWeight:700,padding:"2px 8px",borderRadius:99,background:"rgba(16,185,129,0.1)",color:"#34D399",border:"1px solid rgba(16,185,129,0.2)"}}>Done</span>
                       :<button onClick={()=>{setActiveExercise(ex);setExCode(ex.starter_code||"# Write your solution here\n");setExResult(null);}} style={{padding:"6px 12px",borderRadius:7,border:"1px solid rgba(59,130,246,0.25)",background:"rgba(59,130,246,0.1)",color:"#60A5FA",fontSize:11,fontWeight:600,cursor:"pointer"}}>Start</button>}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Teacher Help Notifications */}
+            {notifications.length>0&&(
+              <div style={{background:"rgba(30,41,59,0.4)",border:"1px solid rgba(16,185,129,0.15)",borderRadius:14,overflow:"hidden"}}>
+                <div style={{padding:"13px 15px",borderBottom:"1px solid rgba(148,163,184,0.06)",display:"flex",alignItems:"center",gap:9}}>
+                  <span style={{fontSize:13,fontWeight:600,color:"#F1F5F9"}}>Teacher Activity</span>
+                  {unseenNotifs>0&&<span style={{fontSize:10,fontWeight:700,padding:"1px 6px",borderRadius:99,background:"rgba(16,185,129,0.15)",color:"#34D399",border:"1px solid rgba(16,185,129,0.25)"}}>{unseenNotifs} new</span>}
+                </div>
+                {notifications.slice(0,5).map((n,i)=>(
+                  <div key={n.id} onClick={()=>{
+                    if(!n.seen){setUnseenNotifs(prev=>Math.max(0,prev-1));n.seen=true;fetch("/api/notifications",{method:"POST",headers:{"Content-Type":"application/json",...authHeaders}}).catch(()=>{});}
+                  }} style={{padding:"10px 15px",borderBottom:i<Math.min(notifications.length,5)-1?"1px solid rgba(148,163,184,0.04)":"none",display:"flex",alignItems:"center",gap:10}}>
+                    <div style={{width:28,height:28,borderRadius:8,background:"rgba(16,185,129,0.12)",border:"1px solid rgba(16,185,129,0.25)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,flexShrink:0}}>✓</div>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontSize:12,color:"#E2E8F0"}}>
+                        <strong style={{color:"#34D399"}}>{n.resolved_by_name}</strong> helped with your <strong>{n.topic}</strong> struggle
+                      </div>
+                      <div style={{fontSize:10,color:"#475569"}}>{n.resolved_at?new Date(n.resolved_at).toLocaleString():""}</div>
+                    </div>
+                    {!n.seen&&<span style={{width:7,height:7,borderRadius:"50%",background:"#10B981",flexShrink:0}}/>}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Teacher Reviews */}
+            {reviews.length>0&&(
+              <div style={{background:"rgba(30,41,59,0.4)",border:"1px solid rgba(139,92,246,0.15)",borderRadius:14,overflow:"hidden"}}>
+                <div style={{padding:"13px 15px",borderBottom:"1px solid rgba(148,163,184,0.06)",display:"flex",alignItems:"center",gap:9}}>
+                  <span style={{fontSize:13,fontWeight:600,color:"#F1F5F9"}}>Teacher Reviews</span>
+                  <span style={{fontSize:10,fontWeight:700,padding:"1px 6px",borderRadius:99,background:"rgba(139,92,246,0.15)",color:"#A78BFA",border:"1px solid rgba(139,92,246,0.25)"}}>{reviews.length}</span>
+                  {unseenReviews>0&&<span style={{fontSize:10,fontWeight:700,padding:"1px 6px",borderRadius:99,background:"rgba(245,158,11,0.15)",color:"#FBBF24",border:"1px solid rgba(245,158,11,0.25)"}}>{unseenReviews} new</span>}
+                </div>
+                {reviews.map((r,i)=>{
+                  const isOpen=expandedReview===r.id;
+                  return(
+                    <div key={r.id} style={{borderBottom:i<reviews.length-1?"1px solid rgba(148,163,184,0.04)":"none"}}>
+                      <div onClick={()=>{
+                        setExpandedReview(isOpen?null:r.id);
+                        if(!r.review_seen&&!isOpen){
+                          setUnseenReviews(prev=>Math.max(0,prev-1));
+                          r.review_seen=true;
+                          fetch("/api/reviews",{method:"POST",headers:{"Content-Type":"application/json",...authHeaders}}).catch(()=>{});
+                        }
+                      }} style={{padding:"12px 15px",display:"flex",alignItems:"center",gap:10,cursor:"pointer",transition:"background 0.15s"}} onMouseEnter={e=>e.currentTarget.style.background="rgba(148,163,184,0.03)"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+                        <div style={{width:28,height:28,borderRadius:8,background:r.result==="success"?"rgba(16,185,129,0.12)":"rgba(244,63,94,0.12)",border:`1px solid ${r.result==="success"?"rgba(16,185,129,0.25)":"rgba(244,63,94,0.25)"}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,flexShrink:0}}>{r.result==="success"?"✓":"✗"}</div>
+                        <div style={{flex:1,minWidth:0}}>
+                          <div style={{display:"flex",alignItems:"center",gap:6}}>
+                            <span style={{fontSize:13,fontWeight:500,color:"#E2E8F0"}}>Review by {r.reviewer_name}</span>
+                            {!r.review_seen&&<span style={{width:7,height:7,borderRadius:"50%",background:"#8B5CF6",flexShrink:0}}/>}
+                          </div>
+                          <div style={{fontSize:10,color:"#475569"}}>{new Date(r.reviewed_at).toLocaleString()}</div>
+                        </div>
+                        <span style={{fontSize:10,fontWeight:700,padding:"2px 7px",borderRadius:99,background:r.result==="success"?"rgba(16,185,129,0.1)":"rgba(244,63,94,0.1)",color:r.result==="success"?"#34D399":"#FB7185"}}>{r.result==="success"?"Pass":"Error"}</span>
+                        <span style={{fontSize:12,color:"#475569",transition:"transform 0.2s",transform:isOpen?"rotate(180deg)":"rotate(0deg)"}}>▼</span>
+                      </div>
+                      {isOpen&&(
+                        <div style={{padding:"0 15px 15px"}}>
+                          {r.teacher_remarks&&(
+                            <div style={{background:"rgba(139,92,246,0.04)",border:"1px solid rgba(139,92,246,0.12)",borderRadius:10,padding:"12px 14px",marginBottom:10}}>
+                              <div style={{fontSize:10,fontWeight:600,color:"#A78BFA",textTransform:"uppercase",marginBottom:4}}>Teacher's Remarks</div>
+                              <div style={{fontSize:12,color:"#CBD5E1",lineHeight:1.7,whiteSpace:"pre-wrap"}}>{r.teacher_remarks}</div>
+                            </div>
+                          )}
+                          <div style={{marginBottom:10}}>
+                            <div style={{fontSize:10,fontWeight:600,color:"#64748B",textTransform:"uppercase",marginBottom:4}}>Your Code</div>
+                            <pre style={{margin:0,padding:"10px 12px",background:"rgba(15,23,42,0.6)",borderRadius:8,fontSize:11,color:"#94A3B8",lineHeight:1.5,fontFamily:"'Cascadia Code','Fira Code',monospace",whiteSpace:"pre-wrap",wordBreak:"break-word",maxHeight:160,overflowY:"auto"}}>{r.code}</pre>
+                          </div>
+                          {r.teacher_code&&(
+                            <div>
+                              <div style={{fontSize:10,fontWeight:600,color:"#10B981",textTransform:"uppercase",marginBottom:4}}>Teacher's Corrected Code</div>
+                              <pre style={{margin:0,padding:"10px 12px",background:"rgba(16,185,129,0.04)",border:"1px solid rgba(16,185,129,0.12)",borderRadius:8,fontSize:11,color:"#E2E8F0",lineHeight:1.5,fontFamily:"'Cascadia Code','Fira Code',monospace",whiteSpace:"pre-wrap",wordBreak:"break-word",maxHeight:200,overflowY:"auto"}}>{r.teacher_code}</pre>
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   );
                 })}
@@ -916,16 +1518,43 @@ function StudentDashboard({ user }) {
               </div>
             </div>
             <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(190px,1fr))",gap:9}}>
-              {topics.map(t=>{const ls=LEVEL[t.level]||LEVEL.Beginner;return(
-                <div key={t.name} style={{background:"rgba(30,41,59,0.4)",border:"1px solid rgba(148,163,184,0.07)",borderRadius:11,padding:"12px 13px"}}>
+              {topics.map(t=>{const ls=LEVEL[t.level]||LEVEL.Beginner;const isExp=expandedTopic===t.name;return(
+                <div key={t.name} onClick={()=>setExpandedTopic(isExp?null:t.name)} style={{background:isExp?"rgba(30,41,59,0.6)":"rgba(30,41,59,0.4)",border:`1px solid ${isExp?ls.border:"rgba(148,163,184,0.07)"}`,borderRadius:11,padding:"12px 13px",cursor:"pointer",transition:"all 0.2s ease",gridColumn:isExp?"1 / -1":"auto"}}>
                   <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
                     <span style={{fontSize:13,fontWeight:600,color:"#E2E8F0"}}>{t.name}</span>
-                    <span style={{fontSize:9,fontWeight:700,padding:"2px 6px",borderRadius:99,color:ls.color,background:ls.bg,border:`1px solid ${ls.border}`}}>{ls.label}</span>
+                    <div style={{display:"flex",alignItems:"center",gap:6}}>
+                      <span style={{fontSize:9,fontWeight:700,padding:"2px 6px",borderRadius:99,color:ls.color,background:ls.bg,border:`1px solid ${ls.border}`}}>{ls.label}</span>
+                      <span style={{fontSize:10,color:"#64748B",transition:"transform 0.2s",transform:isExp?"rotate(180deg)":"rotate(0deg)"}}>▼</span>
+                    </div>
                   </div>
                   <div style={{display:"flex",alignItems:"center",gap:7}}>
                     <div style={{flex:1,height:3,borderRadius:99,background:"rgba(148,163,184,0.08)",overflow:"hidden"}}><div style={{height:"100%",width:`${t.pct}%`,borderRadius:99,background:ls.bar}}/></div>
                     <span style={{fontSize:12,fontWeight:700,color:ls.color,width:30,textAlign:"right"}}>{t.pct}%</span>
                   </div>
+                  {isExp&&(
+                    <div style={{marginTop:12,paddingTop:12,borderTop:"1px solid rgba(148,163,184,0.1)"}}>
+                      <div style={{fontSize:11,fontWeight:600,color:"#94A3B8",marginBottom:8,textTransform:"uppercase",letterSpacing:"0.05em"}}>Mastery Breakdown</div>
+                      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+                        {[
+                          {label:"Exercises",value:t.exercises_completed||0,weight:"40%",color:"#3B82F6"},
+                          {label:"Quizzes",value:t.quiz_score||0,weight:"30%",color:"#8B5CF6"},
+                          {label:"Code Quality",value:t.code_quality||0,weight:"20%",color:"#10B981"},
+                          {label:"Streak",value:Math.min((t.streak||0)*10,100),weight:"10%",color:"#F59E0B"},
+                        ].map(m=>(
+                          <div key={m.label} style={{background:"rgba(15,23,42,0.5)",borderRadius:8,padding:"8px 10px"}}>
+                            <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
+                              <span style={{fontSize:11,color:"#94A3B8"}}>{m.label}</span>
+                              <span style={{fontSize:11,fontWeight:700,color:m.color}}>{m.value}%</span>
+                            </div>
+                            <div style={{height:3,borderRadius:99,background:"rgba(148,163,184,0.08)",overflow:"hidden"}}>
+                              <div style={{height:"100%",width:`${m.value}%`,borderRadius:99,background:m.color,transition:"width 0.3s ease"}}/>
+                            </div>
+                            <div style={{fontSize:9,color:"#475569",marginTop:3}}>Weight: {m.weight}</div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               );})}
             </div>
@@ -939,15 +1568,18 @@ function StudentDashboard({ user }) {
 // ══════════════════════════════════════════════════════════════════════════════
 // TEACHER DASHBOARD
 // ══════════════════════════════════════════════════════════════════════════════
-function TeacherDashboard({ user }) {
+function TeacherDashboard({ user, onSignup }) {
   const isDemo = !user || user.id === 0;
   const token = typeof window !== "undefined" ? localStorage.getItem("lf_token") : null;
   const authHeaders = token ? { Authorization: `Bearer ${token}`, "Content-Type": "application/json" } : {};
+  const limiter = useLimits(user);
+  const [upgradeModal, setUpgradeModal] = useState(null);
   const [search,setSearch]=useState("");
   const [prompt,setPrompt]=useState("");
   const [generating,setGenerating]=useState(false);
   const [generatedEx,setGeneratedEx]=useState(null);
   const [students,setStudents]=useState(isDemo?STUDENTS:[]);
+  const [unassigned,setUnassigned]=useState([]);
   const [alerts,setAlerts]=useState(isDemo?ALERTS:[]);
   const [assignModal,setAssignModal]=useState(null);
   const [assignStudent,setAssignStudent]=useState("");
@@ -959,6 +1591,69 @@ function TeacherDashboard({ user }) {
   const [quizDiff,setQuizDiff]=useState("beginner");
   const [genQuiz,setGenQuiz]=useState(false);
   const [genQuizResult,setGenQuizResult]=useState(null);
+  const [statsExpanded,setStatsExpanded]=useState(null);
+  const [studentDetail,setStudentDetail]=useState(null);
+  const [detailLoading,setDetailLoading]=useState(false);
+  const [codeViewer,setCodeViewer]=useState(null);
+  const [codeLoading,setCodeLoading]=useState(false);
+  const [reviewOpen,setReviewOpen]=useState(null);
+  const [reviewRemarks,setReviewRemarks]=useState("");
+  const [reviewCode,setReviewCode]=useState("");
+  const [reviewSending,setReviewSending]=useState(false);
+
+  const openStudentDetail = async (studentId) => {
+    if(isDemo) return;
+    setDetailLoading(true);
+    setStudentDetail(null);
+    try {
+      const res = await fetch(`/api/teacher/student-detail?id=${studentId}`,{headers:authHeaders});
+      if(!res.ok) throw new Error("Failed to load");
+      const data = await res.json();
+      setStudentDetail(data);
+    } catch(e) {
+      setToast({message:e.message||"Failed to load student details",type:"error"});
+      setDetailLoading(false);
+    }
+    setDetailLoading(false);
+  };
+
+  const viewStudentCode = async (userId, studentName, topic) => {
+    if(isDemo) return;
+    setCodeLoading(true);
+    setCodeViewer(null);
+    try {
+      const url = `/api/teacher/student-code?student_id=${userId}${topic ? `&topic=${encodeURIComponent(topic)}` : ""}`;
+      const res = await fetch(url, { headers: authHeaders });
+      if(!res.ok) throw new Error("Failed to load code");
+      const data = await res.json();
+      setCodeViewer({ studentName: data.student_name || studentName, topic: data.topic || topic, submissions: data.submissions || [] });
+    } catch(e) {
+      setToast({ message: e.message || "Failed to load student code", type: "error" });
+      setTimeout(() => setToast(null), 3000);
+    }
+    setCodeLoading(false);
+  };
+
+  const sendReview = async (submissionId) => {
+    if(!reviewRemarks.trim()&&!reviewCode.trim()) return;
+    setReviewSending(true);
+    try {
+      const res = await fetch("/api/teacher/review-code", {
+        method: "POST", headers: authHeaders,
+        body: JSON.stringify({ submission_id: submissionId, teacher_remarks: reviewRemarks.trim()||null, teacher_code: reviewCode.trim()||null })
+      });
+      if(!res.ok) throw new Error("Failed to send review");
+      // Update local state to show reviewed badge
+      setCodeViewer(prev => prev ? {...prev, submissions: prev.submissions.map(s => s.id===submissionId ? {...s, reviewed_at: new Date().toISOString(), teacher_remarks: reviewRemarks.trim(), teacher_code: reviewCode.trim()} : s)} : prev);
+      setReviewOpen(null); setReviewRemarks(""); setReviewCode("");
+      setToast({ message: "Review sent! Student will see it on their dashboard.", type: "success" });
+      setTimeout(() => setToast(null), 4000);
+    } catch(e) {
+      setToast({ message: e.message || "Failed to send review", type: "error" });
+      setTimeout(() => setToast(null), 3000);
+    }
+    setReviewSending(false);
+  };
 
   const ALERT_TYPE_LABELS = {
     repeated_error: { label: "Repeated Errors", color: "#F43F5E", bg: "rgba(244,63,94,0.1)" },
@@ -969,7 +1664,7 @@ function TeacherDashboard({ user }) {
 
   const fetchData = (showLoading=false) => {
     if(isDemo) return;
-    const p1=fetch("/api/teacher/students",{headers:authHeaders}).then(r=>{if(!r.ok)throw new Error();return r.json();}).then(d=>{if(d&&d.students)setStudents(d.students);}).catch(()=>{});
+    const p1=fetch("/api/teacher/students",{headers:authHeaders}).then(r=>{if(!r.ok)throw new Error();return r.json();}).then(d=>{if(d&&d.students)setStudents(d.students);if(d&&d.unassigned)setUnassigned(d.unassigned);}).catch(()=>{});
     const p2=fetch("/api/teacher/alerts",{headers:authHeaders}).then(r=>{if(!r.ok)throw new Error();return r.json();}).then(d=>{if(d&&d.alerts)setAlerts(d.alerts);}).catch(()=>{});
     if(showLoading) Promise.all([p1,p2]).finally(()=>setTeacherLoading(false));
   };
@@ -993,6 +1688,7 @@ function TeacherDashboard({ user }) {
 
   const generateExercise = async () => {
     if(!prompt.trim()||generating)return;
+    if(!limiter.consume("generate_exercise")){setUpgradeModal("generate_exercise");return;}
     setGenerating(true);
     if(isDemo){setTimeout(()=>{setGenerating(false);setGeneratedEx(GENERATED_EX);},1500);return;}
     try {
@@ -1030,31 +1726,337 @@ function TeacherDashboard({ user }) {
   return(
     <div style={{flex:1,overflowY:"auto",padding:"18px 14px"}}>
       {toast&&<Toast message={toast.message} type={toast.type} onClose={()=>setToast(null)}/>}
+      {upgradeModal&&<UpgradeModal action={upgradeModal} tierInfo={limiter} onClose={()=>setUpgradeModal(null)} onSignup={onSignup||(()=>{})}/>}
+      {/* Usage indicator for teacher */}
+      {limiter.tier!=="pro"&&(
+        <div style={{display:"flex",alignItems:"center",gap:12,padding:"8px 14px",marginBottom:12,background:limiter.isDemo?"rgba(251,191,36,0.06)":"rgba(16,185,129,0.06)",border:"1px solid "+(limiter.isDemo?"rgba(251,191,36,0.12)":"rgba(16,185,129,0.12)"),borderRadius:10,overflowX:"auto"}}>
+          <span style={{fontSize:10,fontWeight:700,color:limiter.isDemo?"#FBBF24":"#10B981",textTransform:"uppercase",letterSpacing:"0.08em",flexShrink:0}}>{limiter.isDemo?"Demo":"Free"}</span>
+          {["generate_exercise","generate_quiz"].map(a=>{const s=limiter.check(a);return(
+            <div key={a} style={{display:"flex",alignItems:"center",gap:4,flexShrink:0}}>
+              <span style={{fontSize:10,color:"#64748B"}}>{a==="generate_exercise"?"Exercises":"Quizzes"}:</span>
+              <span style={{fontSize:10,fontWeight:600,color:s.remaining===0?"#FB7185":s.remaining<=1?"#FBBF24":"#94A3B8"}}>{s.remaining}/{s.limit}</span>
+            </div>
+          );})}
+        </div>
+      )}
       {assignModal&&<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.6)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center",padding:20}} onClick={()=>setAssignModal(null)}>
-        <div onClick={e=>e.stopPropagation()} style={{background:"#1E293B",border:"1px solid rgba(148,163,184,0.15)",borderRadius:16,padding:24,maxWidth:420,width:"100%"}}>
+        <div onClick={e=>e.stopPropagation()} style={{background:"#1E293B",border:"1px solid rgba(148,163,184,0.15)",borderRadius:16,padding:24,maxWidth:460,width:"100%",maxHeight:"85vh",overflowY:"auto"}}>
           <div style={{fontSize:15,fontWeight:700,color:"#F1F5F9",marginBottom:4}}>Assign Exercise</div>
-          <div style={{fontSize:12,color:"#94A3B8",marginBottom:16}}>{assignModal.title}</div>
-          <div style={{fontSize:12,color:"#94A3B8",marginBottom:6}}>Select Student:</div>
-          <select value={assignStudent} onChange={e=>setAssignStudent(e.target.value)} style={{width:"100%",padding:"10px 12px",background:"rgba(15,23,42,0.6)",border:"1px solid rgba(148,163,184,0.15)",borderRadius:9,color:"#E2E8F0",fontSize:13,marginBottom:16,fontFamily:"inherit"}}>
-            <option value="">Choose a student…</option>
-            {students.map(s=><option key={s.id} value={s.id}>{s.name} — {s.module} ({s.mastery}%)</option>)}
-          </select>
-          <div style={{display:"flex",gap:8,justifyContent:"flex-end"}}>
-            <button onClick={()=>setAssignModal(null)} style={{padding:"8px 16px",borderRadius:8,border:"1px solid rgba(148,163,184,0.15)",background:"transparent",color:"#94A3B8",fontSize:12,fontWeight:600,cursor:"pointer"}}>Cancel</button>
-            <button onClick={assignExercise} disabled={!assignStudent||assigning} style={{padding:"8px 16px",borderRadius:8,border:"none",background:assignStudent?"linear-gradient(135deg,#8B5CF6,#6366F1)":"rgba(148,163,184,0.1)",color:assignStudent?"white":"#475569",fontSize:12,fontWeight:600,cursor:assignStudent?"pointer":"default"}}>{assigning?"Assigning…":"Assign"}</button>
-          </div>
+          {assignModal.student_id ? (<>
+            {/* Smart assign — student pre-filled from alert */}
+            <div style={{display:"flex",alignItems:"center",gap:10,background:"rgba(139,92,246,0.06)",border:"1px solid rgba(139,92,246,0.15)",borderRadius:10,padding:"10px 14px",marginBottom:16,marginTop:8}}>
+              <div style={{width:32,height:32,borderRadius:"50%",background:"linear-gradient(135deg,#8B5CF6,#6366F1)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:700,color:"white",flexShrink:0}}>{assignModal.student_name?.split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase()}</div>
+              <div style={{flex:1}}>
+                <div style={{fontSize:13,fontWeight:600,color:"#E2E8F0"}}>{assignModal.student_name}</div>
+                <div style={{fontSize:10,color:"#A78BFA"}}>Struggling on {assignModal.topic||"General"}</div>
+              </div>
+            </div>
+            <div style={{display:"grid",gap:12,marginBottom:16}}>
+              <div>
+                <div style={{fontSize:11,fontWeight:600,color:"#94A3B8",marginBottom:4}}>Topic</div>
+                <select value={assignModal.topic||""} onChange={e=>setAssignModal(prev=>({...prev,topic:e.target.value}))} style={{width:"100%",padding:"10px 12px",background:"rgba(15,23,42,0.6)",border:"1px solid rgba(148,163,184,0.15)",borderRadius:9,color:"#E2E8F0",fontSize:13,fontFamily:"inherit"}}>
+                  {["Variables","Data Types","Loops","Lists","Functions","OOP","Error Handling","Libraries","General"].map(t=><option key={t} value={t}>{t}</option>)}
+                </select>
+              </div>
+              <div>
+                <div style={{fontSize:11,fontWeight:600,color:"#94A3B8",marginBottom:4}}>Difficulty Level</div>
+                <div style={{display:"flex",gap:6}}>
+                  {["beginner","intermediate","advanced"].map(d=>(
+                    <button key={d} onClick={()=>setAssignModal(prev=>({...prev,difficulty:d}))} style={{flex:1,padding:"9px",borderRadius:8,border:`1px solid ${assignModal.difficulty===d?"rgba(139,92,246,0.4)":"rgba(148,163,184,0.1)"}`,background:assignModal.difficulty===d?"rgba(139,92,246,0.12)":"rgba(15,23,42,0.4)",color:assignModal.difficulty===d?"#C4B5FD":"#64748B",fontSize:12,fontWeight:assignModal.difficulty===d?700:500,cursor:"pointer",textTransform:"capitalize"}}>{d}</button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <div style={{fontSize:11,fontWeight:600,color:"#94A3B8",marginBottom:4}}>Number of Questions</div>
+                <div style={{display:"flex",gap:6}}>
+                  {[5,7,10].map(n=>(
+                    <button key={n} onClick={()=>setAssignModal(prev=>({...prev,numQuestions:n}))} style={{flex:1,padding:"9px",borderRadius:8,border:`1px solid ${(assignModal.numQuestions||5)===n?"rgba(139,92,246,0.4)":"rgba(148,163,184,0.1)"}`,background:(assignModal.numQuestions||5)===n?"rgba(139,92,246,0.12)":"rgba(15,23,42,0.4)",color:(assignModal.numQuestions||5)===n?"#C4B5FD":"#64748B",fontSize:12,fontWeight:(assignModal.numQuestions||5)===n?700:500,cursor:"pointer"}}>{n} Qs</button>
+                  ))}
+                </div>
+              </div>
+            </div>
+            <div style={{display:"flex",gap:8,justifyContent:"flex-end"}}>
+              <button onClick={()=>setAssignModal(null)} style={{padding:"9px 18px",borderRadius:8,border:"1px solid rgba(148,163,184,0.15)",background:"transparent",color:"#94A3B8",fontSize:12,fontWeight:600,cursor:"pointer"}}>Cancel</button>
+              <button onClick={async()=>{
+                if(assigning)return;
+                if(!limiter.consume("generate_exercise")){setUpgradeModal("generate_exercise");return;}
+                setAssigning(true);
+                try{
+                  const topic=assignModal.topic||"General";
+                  const diff=assignModal.difficulty||"beginner";
+                  const numQ=assignModal.numQuestions||5;
+                  const genRes=await fetch("/api/teacher/exercises/generate",{method:"POST",headers:authHeaders,body:JSON.stringify({prompt:`Create a ${diff} Python exercise about ${topic} with ${numQ} questions/tasks. The student is struggling with this topic and needs practice.`,difficulty:diff,topic})});
+                  const ex=await genRes.json();
+                  if(!ex.title) throw new Error("Generation failed");
+                  const assignRes=await fetch("/api/teacher/assign",{method:"POST",headers:authHeaders,body:JSON.stringify({student_id:assignModal.student_id,title:ex.title,description:ex.description||"",starter_code:ex.starter_code||"",difficulty:diff,topic})});
+                  if(!assignRes.ok) throw new Error("Failed to assign");
+                  setAssignModal(null);setAssignStudent("");
+                  setToast({message:`Exercise "${ex.title}" generated and assigned to ${assignModal.student_name}!`,type:"success"});
+                  setTimeout(()=>setToast(null),4000);
+                }catch(e){setToast({message:e.message||"Failed to generate exercise",type:"error"});setTimeout(()=>setToast(null),3000);}
+                setAssigning(false);
+              }} disabled={assigning} style={{padding:"9px 20px",borderRadius:8,border:"none",background:"linear-gradient(135deg,#8B5CF6,#6366F1)",color:"white",fontSize:12,fontWeight:600,cursor:"pointer",opacity:assigning?0.6:1,display:"flex",alignItems:"center",gap:6}}>
+                {assigning?<><LoadingSpinner size={12} color="white"/> Generating...</>:<><span>✨</span> Generate & Assign</>}
+              </button>
+            </div>
+          </>) : (<>
+            {/* Fallback — manual assign (from student detail or other contexts) */}
+            <div style={{fontSize:12,color:"#94A3B8",marginBottom:16,marginTop:4}}>{assignModal.title}</div>
+            <div style={{fontSize:12,color:"#94A3B8",marginBottom:6}}>Select Student:</div>
+            <select value={assignStudent} onChange={e=>setAssignStudent(e.target.value)} style={{width:"100%",padding:"10px 12px",background:"rgba(15,23,42,0.6)",border:"1px solid rgba(148,163,184,0.15)",borderRadius:9,color:"#E2E8F0",fontSize:13,marginBottom:16,fontFamily:"inherit"}}>
+              <option value="">Choose a student…</option>
+              {students.map(s=><option key={s.id} value={s.id}>{s.name} — {s.module} ({s.mastery}%)</option>)}
+            </select>
+            <div style={{display:"flex",gap:8,justifyContent:"flex-end"}}>
+              <button onClick={()=>setAssignModal(null)} style={{padding:"8px 16px",borderRadius:8,border:"1px solid rgba(148,163,184,0.15)",background:"transparent",color:"#94A3B8",fontSize:12,fontWeight:600,cursor:"pointer"}}>Cancel</button>
+              <button onClick={assignExercise} disabled={!assignStudent||assigning} style={{padding:"8px 16px",borderRadius:8,border:"none",background:assignStudent?"linear-gradient(135deg,#8B5CF6,#6366F1)":"rgba(148,163,184,0.1)",color:assignStudent?"white":"#475569",fontSize:12,fontWeight:600,cursor:assignStudent?"pointer":"default"}}>{assigning?"Assigning…":"Assign"}</button>
+            </div>
+          </>)}
+        </div>
+      </div>}
+      {(studentDetail||detailLoading)&&<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.7)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center",padding:8}} onClick={()=>{setStudentDetail(null);setDetailLoading(false);}}>
+        <div onClick={e=>e.stopPropagation()} style={{background:"#1E293B",border:"1px solid rgba(148,163,184,0.15)",borderRadius:16,padding:0,maxWidth:600,width:"100%",maxHeight:"90vh",overflowY:"auto"}}>
+          {detailLoading&&!studentDetail?<div style={{padding:40,textAlign:"center"}}><LoadingSpinner size={28} color="#3B82F6"/><div style={{fontSize:12,color:"#64748B",marginTop:8}}>Loading student profile...</div></div>
+          :studentDetail&&(<>
+            <div style={{padding:"14px 14px",borderBottom:"1px solid rgba(148,163,184,0.1)",display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
+              <Avatar initials={studentDetail.student.name.split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase()} color="#3B82F6" size={36}/>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontSize:15,fontWeight:700,color:"#F1F5F9",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{studentDetail.student.name}</div>
+                <div style={{fontSize:10,color:"#64748B",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{studentDetail.student.email}</div>
+              </div>
+              <div style={{display:"flex",alignItems:"center",gap:6,flexShrink:0}}>
+                {studentDetail.stuck_topics.length>0&&<span style={{fontSize:9,fontWeight:700,padding:"2px 7px",borderRadius:99,background:"rgba(244,63,94,0.12)",color:"#FB7185",border:"1px solid rgba(244,63,94,0.25)"}}>Struggling</span>}
+                <button onClick={()=>{setStudentDetail(null);setDetailLoading(false);}} style={{padding:"4px 8px",borderRadius:6,border:"1px solid rgba(148,163,184,0.15)",background:"transparent",color:"#64748B",fontSize:14,cursor:"pointer"}}>✕</button>
+              </div>
+            </div>
+            <div style={{padding:"12px 14px"}}>
+              <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:8,marginBottom:14}}>
+                {[
+                  {l:"Avg Mastery",v:studentDetail.progress.length?Math.round(studentDetail.progress.reduce((a,p)=>a+p.pct,0)/studentDetail.progress.length)+"%":"0%",c:"#3B82F6"},
+                  {l:"Topics",v:`${studentDetail.progress.filter(p=>p.pct>0).length}/${studentDetail.progress.length}`,c:"#8B5CF6"},
+                  {l:"Quizzes",v:String(studentDetail.quiz_attempts.length),c:"#10B981"},
+                  {l:"Exercises",v:String(studentDetail.exercises.length),c:"#F59E0B"},
+                ].map(s=>(
+                  <div key={s.l} style={{background:"rgba(15,23,42,0.5)",borderRadius:9,padding:"8px 10px",textAlign:"center"}}>
+                    <div style={{fontSize:16,fontWeight:800,color:s.c}}>{s.v}</div>
+                    <div style={{fontSize:9,color:"#475569",textTransform:"uppercase"}}>{s.l}</div>
+                  </div>
+                ))}
+              </div>
+              {studentDetail.stuck_topics.length>0&&(
+                <div style={{background:"rgba(244,63,94,0.08)",border:"1px solid rgba(244,63,94,0.2)",borderRadius:10,padding:"8px 12px",marginBottom:14}}>
+                  <div style={{fontSize:11,fontWeight:700,color:"#FB7185",marginBottom:4}}>Stuck On</div>
+                  <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
+                    {studentDetail.stuck_topics.map(t=>(
+                      <span key={t} style={{fontSize:10,fontWeight:600,padding:"2px 7px",borderRadius:6,background:"rgba(244,63,94,0.15)",color:"#FB7185"}}>{t}</span>
+                    ))}
+                  </div>
+                </div>
+              )}
+              <div style={{fontSize:12,fontWeight:700,color:"#E2E8F0",marginBottom:6}}>Progress by Topic</div>
+              <div style={{display:"grid",gap:5,marginBottom:14}}>
+                {studentDetail.progress.map(p=>{const ls=LEVEL[p.level]||LEVEL.Beginner;return(
+                  <div key={p.topic} style={{background:p.stuck?"rgba(244,63,94,0.06)":"rgba(15,23,42,0.4)",border:`1px solid ${p.stuck?"rgba(244,63,94,0.2)":"rgba(148,163,184,0.05)"}`,borderRadius:8,padding:"7px 10px"}}>
+                    <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:4}}>
+                      <span style={{fontSize:11,fontWeight:600,color:"#E2E8F0",flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.topic}</span>
+                      <span style={{fontSize:10,fontWeight:700,color:p.stuck?"#FB7185":ls.color,flexShrink:0}}>{p.pct}%</span>
+                      <span style={{fontSize:8,fontWeight:600,padding:"1px 5px",borderRadius:99,color:ls.color,background:ls.bg,flexShrink:0}}>{ls.label}</span>
+                      {p.stuck&&<span style={{fontSize:8,color:"#F43F5E",flexShrink:0}}>⚠️</span>}
+                    </div>
+                    <div style={{height:3,borderRadius:99,background:"rgba(148,163,184,0.08)",overflow:"hidden"}}><div style={{height:"100%",width:`${p.pct}%`,borderRadius:99,background:p.stuck?"#F43F5E":ls.bar}}/></div>
+                  </div>
+                );})}
+              </div>
+              {studentDetail.quiz_attempts.length>0&&(<>
+                <div style={{fontSize:12,fontWeight:700,color:"#E2E8F0",marginBottom:6}}>Recent Quizzes</div>
+                <div style={{display:"grid",gap:4,marginBottom:14}}>
+                  {studentDetail.quiz_attempts.slice(0,5).map((q,i)=>(
+                    <div key={i} style={{display:"flex",alignItems:"center",gap:6,background:"rgba(15,23,42,0.4)",borderRadius:7,padding:"6px 10px",flexWrap:"wrap"}}>
+                      <span style={{fontSize:11,color:"#94A3B8",flex:1,minWidth:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{q.topic}</span>
+                      <span style={{fontSize:11,fontWeight:700,color:q.score/q.total>=0.7?"#34D399":q.score/q.total>=0.5?"#FBBF24":"#FB7185",flexShrink:0}}>{q.score}/{q.total}</span>
+                      <span style={{fontSize:9,color:"#475569",flexShrink:0}}>{new Date(q.date).toLocaleDateString()}</span>
+                    </div>
+                  ))}
+                </div>
+              </>)}
+              <div style={{fontSize:12,fontWeight:700,color:"#E2E8F0",marginBottom:6}}>Quick Actions</div>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+                <button onClick={()=>{setStudentDetail(null);setAssignModal({title:"Custom Exercise",description:"Practice exercise assigned by teacher.",starter_code:"# Write your solution here\n",difficulty:"beginner",topic:studentDetail.stuck_topics[0]||"General"});setAssignStudent(String(studentDetail.student.id));}} style={{padding:"10px 6px",borderRadius:9,border:"1px solid #8B5CF630",background:"#8B5CF610",color:"#8B5CF6",fontSize:11,fontWeight:600,cursor:"pointer",textAlign:"center"}}>Assign Exercise</button>
+                <button onClick={()=>{setStudentDetail(null);setQuizTopic(studentDetail.stuck_topics[0]||"");}} style={{padding:"10px 6px",borderRadius:9,border:"1px solid #3B82F630",background:"#3B82F610",color:"#3B82F6",fontSize:11,fontWeight:600,cursor:"pointer",textAlign:"center"}}>Generate Quiz</button>
+              </div>
+            </div>
+          </>)}
+        </div>
+      </div>}
+      {/* Code Viewer Modal */}
+      {(codeViewer||codeLoading)&&<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.75)",zIndex:1001,display:"flex",alignItems:"center",justifyContent:"center",padding:16,backdropFilter:"blur(6px)"}} onClick={()=>{setCodeViewer(null);setCodeLoading(false);}}>
+        <div onClick={e=>e.stopPropagation()} style={{background:"#0F172A",border:"1px solid rgba(148,163,184,0.15)",borderRadius:18,maxWidth:680,width:"100%",maxHeight:"85vh",display:"flex",flexDirection:"column",boxShadow:"0 24px 64px -16px rgba(0,0,0,0.7)"}}>
+          {codeLoading&&!codeViewer?<div style={{padding:40,textAlign:"center"}}><LoadingSpinner size={28} color="#3B82F6"/><div style={{fontSize:12,color:"#64748B",marginTop:8}}>Loading student code...</div></div>
+          :codeViewer&&(<>
+            <div style={{padding:"18px 22px",borderBottom:"1px solid rgba(148,163,184,0.1)",display:"flex",alignItems:"center",gap:12,flexShrink:0}}>
+              <div style={{width:36,height:36,borderRadius:"50%",background:"linear-gradient(135deg,#3B82F6,#1D4ED8)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,fontWeight:700,color:"white"}}>{codeViewer.studentName?.split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase()||"?"}</div>
+              <div style={{flex:1}}>
+                <div style={{fontSize:15,fontWeight:700,color:"#F1F5F9"}}>{codeViewer.studentName}'s Code</div>
+                <div style={{fontSize:11,color:"#64748B"}}>{codeViewer.topic ? `Topic: ${codeViewer.topic}` : "All recent submissions"} — {codeViewer.submissions.length} submission{codeViewer.submissions.length!==1?"s":""}</div>
+              </div>
+              <button onClick={()=>{setCodeViewer(null);setCodeLoading(false);}} style={{width:30,height:30,borderRadius:8,border:"1px solid rgba(148,163,184,0.1)",background:"rgba(30,41,59,0.6)",color:"#94A3B8",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontSize:16}}>✕</button>
+            </div>
+            <div style={{flex:1,overflowY:"auto",padding:"16px 22px"}}>
+              {codeViewer.submissions.length===0?<div style={{textAlign:"center",padding:32}}><div style={{fontSize:28,marginBottom:8}}>📭</div><div style={{fontSize:13,color:"#64748B"}}>No code submissions found for this student.</div></div>
+              :codeViewer.submissions.map((s,i)=>(
+                <div key={s.id} style={{marginBottom:i<codeViewer.submissions.length-1?16:0,background:"rgba(30,41,59,0.4)",border:"1px solid rgba(148,163,184,0.07)",borderRadius:12,overflow:"hidden"}}>
+                  <div style={{padding:"10px 14px",borderBottom:"1px solid rgba(148,163,184,0.06)",display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+                    <span style={{fontSize:10,fontWeight:700,padding:"2px 7px",borderRadius:99,background:s.result==="success"?"rgba(16,185,129,0.12)":"rgba(244,63,94,0.12)",color:s.result==="success"?"#34D399":"#FB7185",border:`1px solid ${s.result==="success"?"rgba(16,185,129,0.25)":"rgba(244,63,94,0.25)"}`}}>{s.result==="success"?"Pass":"Error"}</span>
+                    {s.topic&&<span style={{fontSize:10,color:"#64748B"}}>{s.topic}</span>}
+                    <span style={{fontSize:10,color:"#475569",marginLeft:"auto"}}>{new Date(s.submitted_at).toLocaleString()}</span>
+                  </div>
+                  <pre style={{margin:0,padding:"14px 16px",background:"rgba(15,23,42,0.6)",fontSize:12,color:"#E2E8F0",lineHeight:1.6,overflowX:"auto",fontFamily:"'Cascadia Code','Fira Code',monospace",whiteSpace:"pre-wrap",wordBreak:"break-word",maxHeight:240}}>{s.code}</pre>
+                  {s.feedback&&(
+                    <div style={{padding:"10px 14px",borderTop:"1px solid rgba(148,163,184,0.06)",background:"rgba(15,23,42,0.3)"}}>
+                      <div style={{fontSize:10,fontWeight:600,color:"#64748B",textTransform:"uppercase",marginBottom:4}}>Output / Error</div>
+                      <pre style={{margin:0,fontSize:11,color:s.result==="success"?"#94A3B8":"#FB7185",lineHeight:1.5,fontFamily:"'Cascadia Code','Fira Code',monospace",whiteSpace:"pre-wrap",wordBreak:"break-word",maxHeight:120,overflowY:"auto"}}>{s.feedback}</pre>
+                    </div>
+                  )}
+                  {/* Existing review badge */}
+                  {s.reviewed_at&&reviewOpen!==s.id&&(
+                    <div style={{padding:"10px 14px",borderTop:"1px solid rgba(148,163,184,0.06)",background:"rgba(139,92,246,0.04)"}}>
+                      <div style={{display:"flex",alignItems:"center",gap:6}}>
+                        <span style={{fontSize:10,fontWeight:700,padding:"2px 7px",borderRadius:99,background:"rgba(139,92,246,0.12)",color:"#A78BFA",border:"1px solid rgba(139,92,246,0.25)"}}>Reviewed</span>
+                        <span style={{fontSize:10,color:"#64748B"}}>{new Date(s.reviewed_at).toLocaleString()}</span>
+                        <button onClick={()=>{setReviewOpen(s.id);setReviewRemarks(s.teacher_remarks||"");setReviewCode(s.teacher_code||"");}} style={{marginLeft:"auto",fontSize:10,fontWeight:600,color:"#A78BFA",background:"transparent",border:"none",cursor:"pointer",textDecoration:"underline"}}>Edit Review</button>
+                      </div>
+                      {s.teacher_remarks&&<div style={{fontSize:11,color:"#CBD5E1",marginTop:6,lineHeight:1.5}}>{s.teacher_remarks}</div>}
+                    </div>
+                  )}
+                  {/* Review action bar */}
+                  {!s.reviewed_at&&reviewOpen!==s.id&&(
+                    <div style={{padding:"8px 14px",borderTop:"1px solid rgba(148,163,184,0.06)",display:"flex",justifyContent:"flex-end"}}>
+                      <button onClick={()=>{setReviewOpen(s.id);setReviewRemarks("");setReviewCode(s.code||"");}} style={{padding:"5px 14px",borderRadius:7,border:"1px solid rgba(139,92,246,0.25)",background:"rgba(139,92,246,0.08)",color:"#A78BFA",fontSize:11,fontWeight:600,cursor:"pointer",display:"flex",alignItems:"center",gap:4}}>
+                        <span>📝</span> Add Review
+                      </button>
+                    </div>
+                  )}
+                  {/* Expanded review form */}
+                  {reviewOpen===s.id&&(
+                    <div style={{padding:"14px",borderTop:"1px solid rgba(139,92,246,0.15)",background:"rgba(139,92,246,0.03)"}}>
+                      <div style={{fontSize:12,fontWeight:700,color:"#A78BFA",marginBottom:10}}>Teacher Review</div>
+                      <div style={{marginBottom:10}}>
+                        <div style={{fontSize:10,fontWeight:600,color:"#64748B",textTransform:"uppercase",marginBottom:4}}>Remarks</div>
+                        <textarea value={reviewRemarks} onChange={e=>setReviewRemarks(e.target.value)} placeholder="Great job! / Here's what you can improve..." rows={3} style={{width:"100%",background:"rgba(15,23,42,0.6)",border:"1px solid rgba(148,163,184,0.15)",borderRadius:8,padding:"10px 12px",color:"#E2E8F0",fontSize:12,lineHeight:1.6,fontFamily:"inherit",resize:"vertical",outline:"none"}}/>
+                      </div>
+                      <div style={{marginBottom:12}}>
+                        <div style={{fontSize:10,fontWeight:600,color:"#64748B",textTransform:"uppercase",marginBottom:4}}>Corrected Code <span style={{fontWeight:400,textTransform:"none"}}>(optional)</span></div>
+                        <textarea value={reviewCode} onChange={e=>setReviewCode(e.target.value)} placeholder="Paste corrected or improved code here..." rows={5} style={{width:"100%",background:"rgba(15,23,42,0.6)",border:"1px solid rgba(148,163,184,0.15)",borderRadius:8,padding:"10px 12px",color:"#ABB2BF",fontSize:12,lineHeight:1.6,fontFamily:"'Cascadia Code','Fira Code',monospace",resize:"vertical",outline:"none",tabSize:4}} onKeyDown={e=>{if(e.key==="Tab"){e.preventDefault();const start=e.target.selectionStart;const end=e.target.selectionEnd;setReviewCode(reviewCode.substring(0,start)+"    "+reviewCode.substring(end));setTimeout(()=>{e.target.selectionStart=e.target.selectionEnd=start+4;},0);}}}/>
+                      </div>
+                      <div style={{display:"flex",gap:8,justifyContent:"flex-end"}}>
+                        <button onClick={()=>{setReviewOpen(null);setReviewRemarks("");setReviewCode("");}} style={{padding:"7px 14px",borderRadius:7,border:"1px solid rgba(148,163,184,0.15)",background:"transparent",color:"#94A3B8",fontSize:11,fontWeight:600,cursor:"pointer"}}>Cancel</button>
+                        <button onClick={()=>sendReview(s.id)} disabled={reviewSending||(!reviewRemarks.trim()&&!reviewCode.trim())} style={{padding:"7px 16px",borderRadius:7,border:"none",background:(reviewRemarks.trim()||reviewCode.trim())?"linear-gradient(135deg,#7C3AED,#8B5CF6)":"rgba(148,163,184,0.1)",color:(reviewRemarks.trim()||reviewCode.trim())?"white":"#475569",fontSize:11,fontWeight:600,cursor:(reviewRemarks.trim()||reviewCode.trim())?"pointer":"default"}}>{reviewSending?"Sending...":"Send Review"}</button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </>)}
         </div>
       </div>}
       <div style={{maxWidth:940,margin:"0 auto",display:"flex",flexDirection:"column",gap:18}}>
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(130px,1fr))",gap:10}}>
-          {[{label:"Total Students",value:String(students.length||0),accent:"#3B82F6",e:"👥"},{label:"Avg Mastery",value:students.length?Math.round(students.reduce((a,s)=>a+s.mastery,0)/students.length)+"%":"0%",accent:"#10B981",e:"📊"},{label:"Active Now",value:String(students.filter(s=>s.active).length),accent:"#10B981",e:"⚡",pulse:true},{label:"Struggling",value:String(students.filter(s=>s.status==="Struggling").length+visible.length),accent:"#F43F5E",e:"⚠️"}].map(c=>(
-            <div key={c.label} style={{background:"rgba(30,41,59,0.5)",border:`1px solid ${c.accent}20`,borderRadius:13,padding:"15px 14px",display:"flex",flexDirection:"column",gap:7}}>
+          {[{key:"students",label:"My Students",value:String(students.length||0),accent:"#3B82F6",e:"👥"},{key:"unassigned",label:"Unassigned",value:String(unassigned.length||0),accent:"#F59E0B",e:"🆓"},{key:"active",label:"Active Now",value:String([...students,...unassigned].filter(s=>s.active).length),accent:"#10B981",e:"⚡",pulse:true},{key:"struggling",label:"Struggling",value:String([...students,...unassigned].filter(s=>s.status==="Struggling").length+visible.length),accent:"#F43F5E",e:"⚠️"}].map(c=>(
+            <div key={c.label} onClick={()=>setStatsExpanded(statsExpanded===c.key?null:c.key)} style={{background:statsExpanded===c.key?"rgba(30,41,59,0.7)":"rgba(30,41,59,0.5)",border:`1px solid ${statsExpanded===c.key?c.accent:c.accent+"20"}`,borderRadius:13,padding:"15px 14px",display:"flex",flexDirection:"column",gap:7,cursor:"pointer",transition:"all 0.2s ease"}}>
               <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}><span style={{fontSize:17}}>{c.e}</span>{c.pulse&&<span style={{width:7,height:7,borderRadius:"50%",background:"#10B981",animation:"pulse2 2s ease-in-out infinite",display:"inline-block"}}/>}</div>
               <div style={{fontSize:22,fontWeight:800,color:"#F1F5F9",letterSpacing:"-0.02em",lineHeight:1}}>{c.value}</div>
-              <div style={{fontSize:11,color:"#64748B"}}>{c.label}</div>
+              <div style={{fontSize:11,color:"#64748B"}}>{c.label} <span style={{fontSize:9,color:"#475569"}}>▼</span></div>
             </div>
           ))}
         </div>
+        {statsExpanded&&(
+          <div style={{background:"rgba(30,41,59,0.4)",border:"1px solid rgba(148,163,184,0.1)",borderRadius:14,padding:"16px",animation:"fadeIn 0.2s ease"}}>
+            {statsExpanded==="students"&&(<>
+              <div style={{fontSize:13,fontWeight:700,color:"#F1F5F9",marginBottom:12}}>My Students ({students.length})</div>
+              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(200px,1fr))",gap:8}}>
+                {students.map(s=>(
+                  <div key={s.id} onClick={()=>openStudentDetail(s.id)} style={{display:"flex",alignItems:"center",gap:8,background:"rgba(15,23,42,0.5)",borderRadius:9,padding:"10px 12px",cursor:"pointer",transition:"border 0.15s",border:"1px solid transparent"}} onMouseEnter={e=>e.currentTarget.style.border="1px solid rgba(148,163,184,0.2)"} onMouseLeave={e=>e.currentTarget.style.border="1px solid transparent"}>
+                    <Avatar initials={s.initials} color={s.color} size={28}/>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontSize:12,fontWeight:600,color:"#E2E8F0",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{s.name}</div>
+                      <div style={{fontSize:10,color:"#475569"}}>{s.module}</div>
+                    </div>
+                    <div style={{fontSize:12,fontWeight:700,color:s.mastery>=71?"#34D399":s.mastery>=41?"#FBBF24":"#FB7185"}}>{s.mastery}%</div>
+                  </div>
+                ))}
+                {students.length===0&&<div style={{fontSize:12,color:"#64748B",padding:8}}>No students enrolled with you yet</div>}
+              </div>
+            </>)}
+            {statsExpanded==="unassigned"&&(<>
+              <div style={{fontSize:13,fontWeight:700,color:"#F1F5F9",marginBottom:4}}>Unassigned Students ({unassigned.length})</div>
+              <div style={{fontSize:11,color:"#64748B",marginBottom:12}}>Students who haven't picked a mentor yet. You can help them or assign exercises.</div>
+              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(200px,1fr))",gap:8}}>
+                {unassigned.map(s=>(
+                  <div key={s.id} onClick={()=>openStudentDetail(s.id)} style={{display:"flex",alignItems:"center",gap:8,background:"rgba(15,23,42,0.5)",borderRadius:9,padding:"10px 12px",cursor:"pointer",transition:"border 0.15s",border:"1px solid rgba(245,158,11,0.1)"}} onMouseEnter={e=>e.currentTarget.style.border="1px solid rgba(245,158,11,0.25)"} onMouseLeave={e=>e.currentTarget.style.border="1px solid rgba(245,158,11,0.1)"}>
+                    <Avatar initials={s.initials} color={s.color} size={28}/>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontSize:12,fontWeight:600,color:"#E2E8F0",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{s.name}</div>
+                      <div style={{fontSize:10,color:"#475569"}}>{s.module}</div>
+                    </div>
+                    <div style={{display:"flex",alignItems:"center",gap:4}}>
+                      <span style={{fontSize:9,fontWeight:600,padding:"1px 5px",borderRadius:99,background:"rgba(245,158,11,0.1)",color:"#FBBF24"}}>unassigned</span>
+                      <div style={{fontSize:12,fontWeight:700,color:s.mastery>=71?"#34D399":s.mastery>=41?"#FBBF24":"#FB7185"}}>{s.mastery}%</div>
+                    </div>
+                  </div>
+                ))}
+                {unassigned.length===0&&<div style={{fontSize:12,color:"#64748B",padding:8}}>All students have a mentor!</div>}
+              </div>
+            </>)}
+            {statsExpanded==="mastery"&&(<>
+              <div style={{fontSize:13,fontWeight:700,color:"#F1F5F9",marginBottom:12}}>Mastery Distribution</div>
+              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(140px,1fr))",gap:8}}>
+                {[
+                  {label:"Mastered (91-100%)",count:students.filter(s=>s.mastery>=91).length,color:"#60A5FA",bg:"rgba(96,165,250,0.1)"},
+                  {label:"Proficient (71-90%)",count:students.filter(s=>s.mastery>=71&&s.mastery<91).length,color:"#34D399",bg:"rgba(52,211,153,0.1)"},
+                  {label:"Learning (41-70%)",count:students.filter(s=>s.mastery>=41&&s.mastery<71).length,color:"#FBBF24",bg:"rgba(251,191,36,0.1)"},
+                  {label:"Beginner (0-40%)",count:students.filter(s=>s.mastery<41).length,color:"#FB7185",bg:"rgba(251,113,133,0.1)"},
+                ].map(l=>(
+                  <div key={l.label} style={{background:l.bg,borderRadius:9,padding:"12px",textAlign:"center",border:`1px solid ${l.color}20`}}>
+                    <div style={{fontSize:24,fontWeight:800,color:l.color}}>{l.count}</div>
+                    <div style={{fontSize:10,color:l.color,marginTop:2}}>{l.label}</div>
+                  </div>
+                ))}
+              </div>
+            </>)}
+            {statsExpanded==="active"&&(<>
+              <div style={{fontSize:13,fontWeight:700,color:"#F1F5F9",marginBottom:12}}>Active Students (last 30 min)</div>
+              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(200px,1fr))",gap:8}}>
+                {students.filter(s=>s.active).map(s=>(
+                  <div key={s.id} onClick={()=>openStudentDetail(s.id)} style={{display:"flex",alignItems:"center",gap:8,background:"rgba(15,23,42,0.5)",borderRadius:9,padding:"10px 12px",cursor:"pointer",transition:"border 0.15s",border:"1px solid transparent"}} onMouseEnter={e=>e.currentTarget.style.border="1px solid rgba(148,163,184,0.2)"} onMouseLeave={e=>e.currentTarget.style.border="1px solid transparent"}>
+                    <div style={{position:"relative"}}><Avatar initials={s.initials} color={s.color} size={28}/><span style={{position:"absolute",bottom:-1,right:-1,width:8,height:8,borderRadius:"50%",background:"#10B981",border:"2px solid #1E293B"}}/></div>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontSize:12,fontWeight:600,color:"#E2E8F0"}}>{s.name}</div>
+                      <div style={{fontSize:10,color:"#475569"}}>{s.module} — {s.mastery}%</div>
+                    </div>
+                  </div>
+                ))}
+                {students.filter(s=>s.active).length===0&&<div style={{fontSize:12,color:"#64748B",padding:8}}>No students active right now</div>}
+              </div>
+            </>)}
+            {statsExpanded==="struggling"&&(<>
+              <div style={{fontSize:13,fontWeight:700,color:"#F1F5F9",marginBottom:12}}>Struggling Students</div>
+              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(200px,1fr))",gap:8}}>
+                {students.filter(s=>s.status==="Struggling"||s.status==="Needs Help").map(s=>(
+                  <div key={s.id} onClick={()=>openStudentDetail(s.id)} style={{display:"flex",alignItems:"center",gap:8,background:"rgba(15,23,42,0.5)",borderRadius:9,padding:"10px 12px",borderLeft:`3px solid ${s.status==="Struggling"?"#F43F5E":"#F59E0B"}`,cursor:"pointer",transition:"opacity 0.15s"}} onMouseEnter={e=>e.currentTarget.style.opacity="0.85"} onMouseLeave={e=>e.currentTarget.style.opacity="1"}>
+                    <Avatar initials={s.initials} color={s.color} size={28}/>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontSize:12,fontWeight:600,color:"#E2E8F0"}}>{s.name}</div>
+                      <div style={{fontSize:10,color:"#475569"}}>{s.module}</div>
+                    </div>
+                    <Badge label={s.status} style={STATUS_STYLE[s.status]}/>
+                  </div>
+                ))}
+                {students.filter(s=>s.status==="Struggling"||s.status==="Needs Help").length===0&&<div style={{fontSize:12,color:"#64748B",padding:8}}>No struggling students right now!</div>}
+              </div>
+            </>)}
+          </div>
+        )}
         <div style={{background:"rgba(30,41,59,0.4)",border:"1px solid rgba(148,163,184,0.07)",borderRadius:14,overflow:"hidden"}}>
           <div style={{display:"flex",alignItems:"center",gap:9,padding:"13px 15px",borderBottom:"1px solid rgba(148,163,184,0.06)"}}>
             <span style={{fontSize:15}}>⚠️</span><span style={{fontSize:13,fontWeight:600,color:"#F1F5F9"}}>Struggle Alerts</span>
@@ -1068,7 +2070,7 @@ function TeacherDashboard({ user }) {
             <div key={a.id} style={{borderBottom:i<visible.length-1?"1px solid rgba(148,163,184,0.05)":"none",borderLeft:`3px solid ${atype.color}`,padding:"13px 15px",display:"flex",flexDirection:"column",gap:9}}>
               <div style={{display:"flex",alignItems:"center",gap:9}}>
                 <Avatar initials={a.initials} color={a.color} size={32}/>
-                <div style={{flex:1,minWidth:0}}><div style={{fontSize:13,fontWeight:600,color:"#E2E8F0"}}>{a.name}</div><div style={{fontSize:11,color:"#64748B"}}>{a.time}</div></div>
+                <div onClick={()=>{if(a.user_id)openStudentDetail(a.user_id);}} style={{flex:1,minWidth:0,cursor:a.user_id?"pointer":"default"}}><div style={{fontSize:13,fontWeight:600,color:"#E2E8F0",textDecoration:a.user_id?"underline":"none",textDecorationColor:"rgba(226,232,240,0.3)",textUnderlineOffset:2}}>{a.name}</div><div style={{fontSize:11,color:"#64748B"}}>{a.time}</div></div>
                 <span style={{fontSize:9,fontWeight:700,padding:"2px 7px",borderRadius:99,background:atype.bg,color:atype.color,border:`1px solid ${atype.color}30`}}>{atype.label}</span>
                 <button onClick={()=>resolveAlert(a.id)} title="Resolve" style={{padding:"4px 7px",borderRadius:6,border:"1px solid rgba(148,163,184,0.1)",background:"transparent",color:"#475569",fontSize:11,cursor:"pointer",flexShrink:0}}>✓</button>
               </div>
@@ -1077,10 +2079,10 @@ function TeacherDashboard({ user }) {
                 <span style={{fontSize:12,fontWeight:600,color:"#E2E8F0"}}>{a.topic}</span>
                 <span style={{fontSize:10,fontWeight:700,padding:"2px 7px",borderRadius:99,background:"rgba(244,63,94,0.1)",color:"#FB7185",border:"1px solid rgba(244,63,94,0.2)",marginLeft:"auto"}}>{a.attempts} attempts</span>
               </div>
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:6}}>
-                <button style={{padding:"7px 4px",borderRadius:7,border:"1px solid #3B82F630",background:"#3B82F612",color:"#3B82F6",fontSize:11,fontWeight:600,cursor:"pointer",textAlign:"center"}}>View Code</button>
+              <div className="lf-grid-3" style={{gap:6}}>
+                <button onClick={()=>viewStudentCode(a.user_id, a.name, a.topic)} style={{padding:"7px 4px",borderRadius:7,border:"1px solid #3B82F630",background:"#3B82F612",color:"#3B82F6",fontSize:11,fontWeight:600,cursor:"pointer",textAlign:"center"}}>{codeLoading?"...":"View Code"}</button>
                 <button onClick={()=>resolveAlert(a.id)} style={{padding:"7px 4px",borderRadius:7,border:"1px solid #10B98130",background:"#10B98112",color:"#10B981",fontSize:11,fontWeight:600,cursor:"pointer",textAlign:"center"}}>Resolve</button>
-                <button onClick={()=>setAssignModal({title:`Help: ${a.topic}`,description:`Practice exercise for ${a.topic} — assigned because you need extra practice.`,starter_code:`# Practice: ${a.topic}\n# Write your solution here\n`,difficulty:"beginner",topic:a.topic})} style={{padding:"7px 4px",borderRadius:7,border:"1px solid #8B5CF630",background:"#8B5CF612",color:"#8B5CF6",fontSize:11,fontWeight:600,cursor:"pointer",textAlign:"center"}}>Assign</button>
+                <button onClick={()=>{setAssignModal({student_id:a.user_id,student_name:a.name,topic:a.topic,difficulty:"beginner",numQuestions:5});setAssignStudent(String(a.user_id));}} style={{padding:"7px 4px",borderRadius:7,border:"1px solid #8B5CF630",background:"#8B5CF612",color:"#8B5CF6",fontSize:11,fontWeight:600,cursor:"pointer",textAlign:"center"}}>Assign</button>
               </div>
             </div>
           );})}
@@ -1099,7 +2101,7 @@ function TeacherDashboard({ user }) {
                 {["Student","Mastery","Status"].map(h=><th key={h} style={{padding:"9px 15px",textAlign:"left",fontSize:10,fontWeight:700,letterSpacing:"0.08em",textTransform:"uppercase",color:"#475569"}}>{h}</th>)}
               </tr></thead>
               <tbody>{filtered.map((s,i)=>(
-                <tr key={s.id} style={{borderBottom:i<filtered.length-1?"1px solid rgba(148,163,184,0.04)":"none"}}>
+                <tr key={s.id} onClick={()=>openStudentDetail(s.id)} style={{borderBottom:i<filtered.length-1?"1px solid rgba(148,163,184,0.04)":"none",cursor:"pointer",transition:"background 0.15s"}} onMouseEnter={e=>e.currentTarget.style.background="rgba(148,163,184,0.04)"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
                   <td style={{padding:"10px 15px"}}><div style={{display:"flex",alignItems:"center",gap:8}}><Avatar initials={s.initials} color={s.color} size={26}/><div><div style={{fontSize:13,fontWeight:500,color:"#E2E8F0"}}>{s.name}</div><div style={{fontSize:10,color:"#475569"}}>{s.module}</div></div></div></td>
                   <td style={{padding:"10px 15px"}}><div style={{display:"flex",alignItems:"center",gap:6}}><div style={{width:64,height:3,borderRadius:99,background:"rgba(148,163,184,0.08)",overflow:"hidden"}}><div style={{height:"100%",width:`${s.mastery}%`,borderRadius:99,background:s.mastery>=71?"#10B981":s.mastery>=41?"#F59E0B":"#F43F5E"}}/></div><span style={{fontSize:12,fontWeight:600,color:s.mastery>=71?"#34D399":s.mastery>=41?"#FBBF24":"#FB7185"}}>{s.mastery}%</span></div></td>
                   <td style={{padding:"10px 15px"}}><Badge label={s.status} style={STATUS_STYLE[s.status]}/></td>
@@ -1146,7 +2148,7 @@ function TeacherDashboard({ user }) {
                 <option value="intermediate">Intermediate</option>
                 <option value="advanced">Advanced</option>
               </select>
-              <button onClick={async()=>{if(!quizTopic||genQuiz)return;setGenQuiz(true);try{const r=await fetch("/api/quizzes/generate",{method:"POST",headers:authHeaders,body:JSON.stringify({topic:quizTopic,difficulty:quizDiff,num_questions:5})});const d=await r.json();if(d.quiz_id)setGenQuizResult(d);}catch{}setGenQuiz(false);}} style={{padding:"9px 16px",borderRadius:9,border:"none",background:quizTopic&&!genQuiz?"linear-gradient(135deg,#7C3AED,#8B5CF6)":"rgba(148,163,184,0.1)",color:quizTopic&&!genQuiz?"white":"#475569",fontSize:13,fontWeight:600,cursor:quizTopic?"pointer":"default",display:"flex",alignItems:"center",gap:7}}>
+              <button onClick={async()=>{if(!quizTopic||genQuiz)return;if(!limiter.consume("generate_quiz")){setUpgradeModal("generate_quiz");return;}setGenQuiz(true);try{const r=await fetch("/api/quizzes/generate",{method:"POST",headers:authHeaders,body:JSON.stringify({topic:quizTopic,difficulty:quizDiff,num_questions:5})});const d=await r.json();if(d.quiz_id)setGenQuizResult(d);}catch{}setGenQuiz(false);}} style={{padding:"9px 16px",borderRadius:9,border:"none",background:quizTopic&&!genQuiz?"linear-gradient(135deg,#7C3AED,#8B5CF6)":"rgba(148,163,184,0.1)",color:quizTopic&&!genQuiz?"white":"#475569",fontSize:13,fontWeight:600,cursor:quizTopic?"pointer":"default",display:"flex",alignItems:"center",gap:7}}>
                 {genQuiz?<><span style={{width:12,height:12,border:"2px solid #C4B5FD",borderTopColor:"transparent",borderRadius:"50%",display:"inline-block",animation:"spin 0.7s linear infinite"}}/>Creating…</>:"✦ Generate Quiz"}
               </button>
             </div>
@@ -1163,13 +2165,1486 @@ function TeacherDashboard({ user }) {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
+// PROGRESS PAGE (Sidebar)
+// ══════════════════════════════════════════════════════════════════════════════
+function TeacherProgressPage({ user }) {
+  const token = typeof window !== "undefined" ? localStorage.getItem("lf_token") : null;
+  const authHeaders = token ? { Authorization: `Bearer ${token}` } : {};
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [expandedSection, setExpandedSection] = useState(null);
+
+  useEffect(() => {
+    fetch("/api/teacher/class-progress", { headers: authHeaders })
+      .then(r => r.json()).then(d => { if (!d.error) setData(d); })
+      .catch(() => {}).finally(() => setLoading(false));
+  }, []);
+
+  if (loading) return <div style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:12}}><LoadingSpinner size={28} color="#3B82F6"/><span style={{fontSize:12,color:"#64748B"}}>Loading class analytics...</span></div>;
+  if (!data) return <div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",color:"#64748B"}}>Failed to load class data</div>;
+
+  const o = data.overview;
+  const dist = data.distribution;
+  const totalInDist = dist.Beginner + dist.Learning + dist.Proficient + dist.Mastered;
+  const distColors = { Beginner: "#F43F5E", Learning: "#FBBF24", Proficient: "#10B981", Mastered: "#3B82F6" };
+
+  return (
+    <div style={{flex:1,overflowY:"auto",padding:"20px 14px"}}>
+      <div style={{maxWidth:700,margin:"0 auto"}}>
+        <div style={{fontSize:18,fontWeight:800,color:"#F1F5F9",marginBottom:16}}>Class Analytics</div>
+
+        {/* Overview Stats */}
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(130px,1fr))",gap:8,marginBottom:20}}>
+          {[
+            {e:"\ud83d\udc65",v:String(o.total_students),l:"Students",sub:"Total enrolled"},
+            {e:"\ud83c\udfaf",v:o.avg_mastery+"%",l:"Avg Mastery",sub:"Class average"},
+            {e:"\ud83d\udcdd",v:String(o.total_exercises),l:"Exercises",sub:"Total assigned"},
+            {e:"\ud83d\udccb",v:String(o.total_quizzes),l:"Quizzes",sub:"Total created"},
+          ].map(s=>(
+            <div key={s.l} style={{background:"rgba(30,41,59,0.5)",border:"1px solid rgba(148,163,184,0.07)",borderRadius:12,padding:"16px",textAlign:"center"}}>
+              <div style={{fontSize:18,marginBottom:6}}>{s.e}</div>
+              <div style={{fontSize:22,fontWeight:800,color:"#E2E8F0"}}>{s.v}</div>
+              <div style={{fontSize:10,fontWeight:600,color:"#64748B",textTransform:"uppercase",marginTop:2}}>{s.l}</div>
+              <div style={{fontSize:9,color:"#475569",marginTop:1}}>{s.sub}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* Mastery Distribution */}
+        <div style={{fontSize:14,fontWeight:700,color:"#F1F5F9",marginBottom:10}}>Mastery Distribution</div>
+        <div style={{background:"rgba(30,41,59,0.5)",border:"1px solid rgba(148,163,184,0.07)",borderRadius:12,padding:"16px",marginBottom:20}}>
+          {totalInDist > 0 ? (
+            <>
+              <div style={{display:"flex",height:24,borderRadius:8,overflow:"hidden",marginBottom:12}}>
+                {Object.entries(dist).map(([level, count]) => count > 0 ? (
+                  <div key={level} style={{width:`${(count/totalInDist)*100}%`,background:distColors[level],display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,fontWeight:700,color:"#fff",minWidth:count>0?20:0}}>{count}</div>
+                ) : null)}
+              </div>
+              <div style={{display:"flex",flexWrap:"wrap",gap:12}}>
+                {Object.entries(dist).map(([level, count]) => (
+                  <div key={level} style={{display:"flex",alignItems:"center",gap:6}}>
+                    <div style={{width:8,height:8,borderRadius:99,background:distColors[level]}}/>
+                    <span style={{fontSize:11,color:"#94A3B8"}}>{level}: <span style={{fontWeight:700,color:"#E2E8F0"}}>{count}</span></span>
+                  </div>
+                ))}
+              </div>
+            </>
+          ) : <div style={{fontSize:12,color:"#64748B",textAlign:"center",padding:8}}>No student data yet</div>}
+        </div>
+
+        {/* Per-Topic Class Performance */}
+        <div style={{fontSize:14,fontWeight:700,color:"#F1F5F9",marginBottom:10}}>Topic Performance (Class Average)</div>
+        <div style={{display:"grid",gap:6,marginBottom:20}}>
+          {data.topics.length > 0 ? data.topics.map(t => {
+            const lvl = t.avg_score >= 91 ? "Mastered" : t.avg_score >= 71 ? "Proficient" : t.avg_score >= 41 ? "Learning" : "Beginner";
+            const ls = LEVEL[lvl] || LEVEL.Beginner;
+            return (
+              <div key={t.topic} style={{background:"rgba(30,41,59,0.4)",border:"1px solid rgba(148,163,184,0.07)",borderRadius:10,padding:"12px 14px"}}>
+                <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:6}}>
+                  <span style={{fontSize:13,fontWeight:600,color:"#E2E8F0"}}>{t.topic}</span>
+                  <div style={{display:"flex",alignItems:"center",gap:6}}>
+                    <span style={{fontSize:9,color:"#64748B"}}>{t.student_count} students</span>
+                    <span style={{fontSize:9,fontWeight:700,padding:"2px 6px",borderRadius:99,color:ls.color,background:ls.bg,border:`1px solid ${ls.border}`}}>{ls.label}</span>
+                  </div>
+                </div>
+                <div style={{display:"flex",alignItems:"center",gap:8}}>
+                  <div style={{flex:1,height:4,borderRadius:99,background:"rgba(148,163,184,0.08)",overflow:"hidden"}}>
+                    <div style={{height:"100%",width:`${t.avg_score}%`,borderRadius:99,background:ls.bar,transition:"width 0.3s"}}/>
+                  </div>
+                  <span style={{fontSize:12,fontWeight:700,color:ls.color,width:35,textAlign:"right"}}>{t.avg_score}%</span>
+                </div>
+              </div>
+            );
+          }) : <div style={{fontSize:12,color:"#64748B",textAlign:"center",padding:12}}>No topic data yet</div>}
+        </div>
+
+        {/* Top Performers & Struggling — side by side */}
+        <div className="lf-grid-2" style={{gap:12,marginBottom:20}}>
+          <div>
+            <div style={{fontSize:14,fontWeight:700,color:"#F1F5F9",marginBottom:8}}>Top Performers</div>
+            <div style={{background:"rgba(30,41,59,0.4)",border:"1px solid rgba(148,163,184,0.07)",borderRadius:10,padding:"10px"}}>
+              {data.top_performers.length > 0 ? data.top_performers.map((s,i) => (
+                <div key={s.id} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 4px",borderBottom:i<data.top_performers.length-1?"1px solid rgba(148,163,184,0.06)":"none"}}>
+                  <span style={{fontSize:12,fontWeight:700,color:i===0?"#FBBF24":i===1?"#94A3B8":i===2?"#CD7F32":"#64748B",width:16}}>{i+1}.</span>
+                  <span style={{fontSize:12,fontWeight:600,color:"#E2E8F0",flex:1}}>{s.name}</span>
+                  <span style={{fontSize:11,fontWeight:700,color:"#10B981"}}>{s.avg_mastery}%</span>
+                </div>
+              )) : <div style={{fontSize:11,color:"#64748B",textAlign:"center",padding:8}}>No data yet</div>}
+            </div>
+          </div>
+          <div>
+            <div style={{fontSize:14,fontWeight:700,color:"#F1F5F9",marginBottom:8}}>Need Attention</div>
+            <div style={{background:"rgba(30,41,59,0.4)",border:"1px solid rgba(148,163,184,0.07)",borderRadius:10,padding:"10px"}}>
+              {data.struggling.length > 0 ? data.struggling.map((s,i) => (
+                <div key={s.id} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 4px",borderBottom:i<data.struggling.length-1?"1px solid rgba(148,163,184,0.06)":"none"}}>
+                  <span style={{fontSize:12,fontWeight:600,color:"#E2E8F0",flex:1}}>{s.name}</span>
+                  <span style={{fontSize:11,fontWeight:700,color:"#F43F5E"}}>{s.avg_mastery}%</span>
+                  {s.alert_count > 0 && <span style={{fontSize:9,fontWeight:700,padding:"1px 5px",borderRadius:99,background:"rgba(244,63,94,0.15)",color:"#FB7185"}}>{s.alert_count} alerts</span>}
+                </div>
+              )) : <div style={{fontSize:11,color:"#64748B",textAlign:"center",padding:8}}>No struggling students</div>}
+            </div>
+          </div>
+        </div>
+
+        {/* Recent Activity */}
+        <div style={{fontSize:14,fontWeight:700,color:"#F1F5F9",marginBottom:10}}>Recent Activity</div>
+        <div style={{display:"grid",gap:6,marginBottom:20}}>
+          {[...data.recent_quizzes.map(q => ({type:"quiz",name:q.student,detail:`${q.topic} - ${q.score}/${q.total}`,date:q.date,color:"#8B5CF6"})),
+            ...data.recent_exercises.map(e => ({type:"exercise",name:e.student,detail:`${e.title||e.topic} - ${e.status}${e.grade?` (${e.grade}%)`:""  }`,date:e.date,color:"#3B82F6"}))
+          ].sort((a,b) => new Date(b.date) - new Date(a.date)).slice(0,10).map((item,i) => (
+            <div key={i} style={{display:"flex",alignItems:"center",gap:10,background:"rgba(30,41,59,0.4)",border:"1px solid rgba(148,163,184,0.07)",borderRadius:9,padding:"10px 14px"}}>
+              <span style={{fontSize:9,fontWeight:700,padding:"2px 6px",borderRadius:6,background:item.type==="quiz"?"rgba(139,92,246,0.12)":"rgba(59,130,246,0.12)",color:item.color}}>{item.type}</span>
+              <span style={{fontSize:12,fontWeight:600,color:"#E2E8F0"}}>{item.name}</span>
+              <span style={{fontSize:11,color:"#94A3B8",flex:1}}>{item.detail}</span>
+              <span style={{fontSize:10,color:"#64748B"}}>{item.date?new Date(item.date).toLocaleDateString():""}</span>
+            </div>
+          ))}
+          {data.recent_quizzes.length === 0 && data.recent_exercises.length === 0 && (
+            <div style={{fontSize:12,color:"#64748B",textAlign:"center",padding:12}}>No recent activity yet</div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ProgressPage({ user, role }) {
+  const token = typeof window !== "undefined" ? localStorage.getItem("lf_token") : null;
+  const authHeaders = token ? { Authorization: `Bearer ${token}` } : {};
+  const [topics, setTopics] = useState([]);
+  const [execStats, setExecStats] = useState({ total: 0, successes: 0, streak: 0, active_days: 0 });
+  const [quizHistory, setQuizHistory] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [expandedTopic, setExpandedTopic] = useState(null);
+
+  useEffect(() => {
+    let loaded = 0;
+    const done = () => { loaded++; if (loaded >= 3) setLoading(false); };
+    fetch("/api/progress", { headers: authHeaders }).then(r => r.json()).then(d => { if (d && d.topics) setTopics(d.topics); }).catch(() => {}).finally(done);
+    fetch("/api/submissions", { headers: authHeaders }).then(r => r.json()).then(d => { if (d && d.stats) setExecStats(d.stats); }).catch(() => {}).finally(done);
+    fetch("/api/quizzes", { headers: authHeaders }).then(r => r.json()).then(d => { if (d && d.quizzes) setQuizHistory(d.quizzes); }).catch(() => {}).finally(done);
+  }, []);
+
+  if (role === "teacher") return <TeacherProgressPage user={user} />;
+
+  if (loading) return <div style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:12}}><LoadingSpinner size={28} color="#3B82F6"/><span style={{fontSize:12,color:"#64748B"}}>Loading progress...</span></div>;
+
+  const avgMastery = topics.length ? Math.round(topics.reduce((a, t) => a + t.pct, 0) / topics.length) : 0;
+  const topicsStarted = topics.filter(t => t.pct > 0).length;
+  const successRate = execStats.total ? Math.round(execStats.successes / execStats.total * 100) : 0;
+
+  return (
+    <div style={{flex:1,overflowY:"auto",padding:"20px 14px"}}>
+      <div style={{maxWidth:700,margin:"0 auto"}}>
+        <div style={{fontSize:18,fontWeight:800,color:"#F1F5F9",marginBottom:16}}>Your Progress</div>
+        <div style={{display:"flex",gap:14,marginBottom:20,flexWrap:"wrap"}}>
+          <div style={{flex:1,minWidth:140,background:"rgba(30,41,59,0.5)",borderRadius:14,padding:"18px",display:"flex",alignItems:"center",gap:14}}>
+            <div style={{position:"relative",width:72,height:72,flexShrink:0}}>
+              <Ring pct={avgMastery} size={72} stroke={6}/>
+              <div style={{position:"absolute",inset:0,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center"}}>
+                <span style={{fontSize:18,fontWeight:800,color:"#F1F5F9"}}>{avgMastery}%</span>
+              </div>
+            </div>
+            <div>
+              <div style={{fontSize:14,fontWeight:700,color:"#F1F5F9"}}>{user?.name || "Student"}</div>
+              <div style={{fontSize:11,color:"#64748B"}}>{topicsStarted} of {topics.length} topics started</div>
+              <div style={{fontSize:11,color:"#64748B",marginTop:2}}>Level: {avgMastery >= 91 ? "Mastered" : avgMastery >= 71 ? "Proficient" : avgMastery >= 41 ? "Learning" : "Beginner"}</div>
+            </div>
+          </div>
+        </div>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(120px,1fr))",gap:8,marginBottom:20}}>
+          {[
+            {e:"🔥",v:execStats.streak+"d",l:"Streak",sub:"Consecutive days"},
+            {e:"📝",v:String(execStats.total),l:"Code Runs",sub:"Total executions"},
+            {e:"✅",v:successRate+"%",l:"Success Rate",sub:`${execStats.successes} passed`},
+            {e:"📅",v:String(execStats.active_days),l:"Active Days",sub:"Total days active"},
+            {e:"📚",v:String(topicsStarted),l:"Topics",sub:`of ${topics.length} total`},
+            {e:"🏆",v:String(quizHistory.length),l:"Quizzes",sub:"Attempted"},
+          ].map(s=>(
+            <div key={s.l} style={{background:"rgba(30,41,59,0.4)",border:"1px solid rgba(148,163,184,0.07)",borderRadius:10,padding:"12px",textAlign:"center"}}>
+              <div style={{fontSize:16,marginBottom:4}}>{s.e}</div>
+              <div style={{fontSize:18,fontWeight:800,color:"#E2E8F0"}}>{s.v}</div>
+              <div style={{fontSize:10,fontWeight:600,color:"#64748B",textTransform:"uppercase"}}>{s.l}</div>
+              <div style={{fontSize:9,color:"#475569",marginTop:1}}>{s.sub}</div>
+            </div>
+          ))}
+        </div>
+        <div style={{fontSize:14,fontWeight:700,color:"#F1F5F9",marginBottom:10}}>Topic Breakdown</div>
+        <div style={{display:"grid",gap:8,marginBottom:20}}>
+          {topics.map(t => {const ls=LEVEL[t.level]||LEVEL.Beginner;const isExp=expandedTopic===t.name;return(
+            <div key={t.name} onClick={()=>setExpandedTopic(isExp?null:t.name)} style={{background:isExp?"rgba(30,41,59,0.6)":"rgba(30,41,59,0.4)",border:`1px solid ${isExp?ls.border:"rgba(148,163,184,0.07)"}`,borderRadius:11,padding:"14px 16px",cursor:"pointer",transition:"all 0.2s ease"}}>
+              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
+                <span style={{fontSize:14,fontWeight:600,color:"#E2E8F0"}}>{t.name}</span>
+                <div style={{display:"flex",alignItems:"center",gap:6}}>
+                  <span style={{fontSize:9,fontWeight:700,padding:"2px 6px",borderRadius:99,color:ls.color,background:ls.bg,border:`1px solid ${ls.border}`}}>{ls.label}</span>
+                  <span style={{fontSize:10,color:"#64748B",transition:"transform 0.2s",transform:isExp?"rotate(180deg)":"rotate(0deg)"}}>▼</span>
+                </div>
+              </div>
+              <div style={{display:"flex",alignItems:"center",gap:8}}>
+                <div style={{flex:1,height:4,borderRadius:99,background:"rgba(148,163,184,0.08)",overflow:"hidden"}}><div style={{height:"100%",width:`${t.pct}%`,borderRadius:99,background:ls.bar,transition:"width 0.3s"}}/></div>
+                <span style={{fontSize:13,fontWeight:700,color:ls.color,width:35,textAlign:"right"}}>{t.pct}%</span>
+              </div>
+              {isExp&&(
+                <div style={{marginTop:12,paddingTop:12,borderTop:"1px solid rgba(148,163,184,0.1)"}}>
+                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+                    {[
+                      {label:"Exercises",value:t.exercises_completed||0,weight:"40%",color:"#3B82F6"},
+                      {label:"Quizzes",value:t.quiz_score||0,weight:"30%",color:"#8B5CF6"},
+                      {label:"Code Quality",value:t.code_quality||0,weight:"20%",color:"#10B981"},
+                      {label:"Streak",value:Math.min((t.streak||0)*10,100),weight:"10%",color:"#F59E0B"},
+                    ].map(m=>(
+                      <div key={m.label} style={{background:"rgba(15,23,42,0.5)",borderRadius:8,padding:"8px 10px"}}>
+                        <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
+                          <span style={{fontSize:11,color:"#94A3B8"}}>{m.label}</span>
+                          <span style={{fontSize:11,fontWeight:700,color:m.color}}>{m.value}%</span>
+                        </div>
+                        <div style={{height:3,borderRadius:99,background:"rgba(148,163,184,0.08)",overflow:"hidden"}}>
+                          <div style={{height:"100%",width:`${m.value}%`,borderRadius:99,background:m.color,transition:"width 0.3s ease"}}/>
+                        </div>
+                        <div style={{fontSize:9,color:"#475569",marginTop:3}}>Weight: {m.weight}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          );})}
+        </div>
+        {quizHistory.length>0&&(<>
+          <div style={{fontSize:14,fontWeight:700,color:"#F1F5F9",marginBottom:10}}>Quiz History</div>
+          <div style={{display:"grid",gap:6,marginBottom:20}}>
+            {quizHistory.slice(0,10).map((q,i)=>(
+              <div key={q.id||i} style={{display:"flex",alignItems:"center",gap:10,background:"rgba(30,41,59,0.4)",border:"1px solid rgba(148,163,184,0.07)",borderRadius:9,padding:"10px 14px"}}>
+                <span style={{fontSize:13,fontWeight:600,color:"#E2E8F0",flex:1}}>{q.topic||"General"}</span>
+                <span style={{fontSize:10,padding:"2px 6px",borderRadius:6,background:q.difficulty==="advanced"?"rgba(244,63,94,0.1)":q.difficulty==="intermediate"?"rgba(251,191,36,0.1)":"rgba(52,211,153,0.1)",color:q.difficulty==="advanced"?"#FB7185":q.difficulty==="intermediate"?"#FBBF24":"#34D399",fontWeight:600}}>{q.difficulty||"beginner"}</span>
+                <span style={{fontSize:12,color:"#64748B"}}>{q.created_at?new Date(q.created_at).toLocaleDateString():""}</span>
+              </div>
+            ))}
+          </div>
+        </>)}
+      </div>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// TEACHERS PAGE (Sidebar — Students browse & pick mentor)
+// ══════════════════════════════════════════════════════════════════════════════
+function TeachersPage({ user }) {
+  const token = typeof window !== "undefined" ? localStorage.getItem("lf_token") : null;
+  const authHeaders = token ? { Authorization: `Bearer ${token}` } : {};
+  const [teachers, setTeachers] = useState([]);
+  const [myMentorId, setMyMentorId] = useState(null);
+  const [removalRequestedAt, setRemovalRequestedAt] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [selectedTeacher, setSelectedTeacher] = useState(null);
+  const [enrolling, setEnrolling] = useState(false);
+  const [removeModal, setRemoveModal] = useState(false);
+  const [removing, setRemoving] = useState(false);
+  const [toast, setToast] = useState(null);
+  const [upgradeModal, setUpgradeModal] = useState(false);
+
+  const loadTeachers = () => {
+    fetch("/api/teachers/list", { headers: authHeaders })
+      .then(r => r.json()).then(d => { if (d.teachers) { setTeachers(d.teachers); setMyMentorId(d.my_mentor_id); setRemovalRequestedAt(d.removal_requested_at || null); } })
+      .catch(() => {}).finally(() => setLoading(false));
+  };
+  useEffect(loadTeachers, []);
+
+  const daysLeft = removalRequestedAt ? Math.max(0, 7 - Math.floor((Date.now() - new Date(removalRequestedAt).getTime()) / 86400000)) : null;
+
+  const requestRemoval = async () => {
+    setRemoving(true);
+    try {
+      const res = await fetch("/api/teachers/unenroll", { method: "POST", headers: { ...authHeaders, "Content-Type": "application/json" }, body: JSON.stringify({ action: "request" }) });
+      if (res.ok) {
+        setRemovalRequestedAt(new Date().toISOString());
+        setRemoveModal(false);
+        setToast({ message: "Removal requested. Your enrollment will end in 7 days.", type: "info" });
+        setTimeout(() => setToast(null), 4000);
+      }
+    } catch(e) { setToast({ message: "Failed to request removal", type: "error" }); setTimeout(() => setToast(null), 3000); }
+    setRemoving(false);
+  };
+
+  const cancelRemoval = async () => {
+    setRemoving(true);
+    try {
+      const res = await fetch("/api/teachers/unenroll", { method: "POST", headers: { ...authHeaders, "Content-Type": "application/json" }, body: JSON.stringify({ action: "cancel" }) });
+      if (res.ok) {
+        setRemovalRequestedAt(null);
+        setToast({ message: "Removal cancelled. You are still enrolled!", type: "success" });
+        setTimeout(() => setToast(null), 3000);
+      }
+    } catch(e) { setToast({ message: "Failed to cancel removal", type: "error" }); setTimeout(() => setToast(null), 3000); }
+    setRemoving(false);
+  };
+
+  const enroll = async (teacherId) => {
+    setEnrolling(true);
+    try {
+      const res = await fetch("/api/teachers/enroll", {
+        method: "POST", headers: { ...authHeaders, "Content-Type": "application/json" },
+        body: JSON.stringify({ teacher_id: teacherId })
+      });
+      if (res.ok) {
+        setMyMentorId(teacherId);
+        setRemovalRequestedAt(null);
+        setTeachers(prev => prev.map(t => ({ ...t, is_my_mentor: t.id === teacherId, student_count: t.id === teacherId ? t.student_count + 1 : (t.is_my_mentor ? t.student_count - 1 : t.student_count) })));
+        setSelectedTeacher(null);
+        setToast({ message: "Mentor selected successfully!", type: "success" });
+        setTimeout(() => setToast(null), 3000);
+      }
+    } catch {}
+    setEnrolling(false);
+  };
+
+  if (loading) return <div style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:12}}><LoadingSpinner size={28} color="#3B82F6"/><span style={{fontSize:12,color:"#64748B"}}>Loading teachers...</span></div>;
+
+  return (
+    <div style={{flex:1,overflowY:"auto",padding:"20px 14px"}}>
+      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
+      <div style={{maxWidth:600,margin:"0 auto"}}>
+        <div style={{fontSize:18,fontWeight:800,color:"#F1F5F9",marginBottom:4}}>Faculty</div>
+        <div style={{fontSize:12,color:"#64748B",marginBottom:16}}>
+          {myMentorId ? "You have an active mentor." : "Browse our faculty and explore their profiles."}
+        </div>
+
+        {/* Current mentor banner */}
+        {myMentorId && (() => {
+          const mentor = teachers.find(t => t.id === myMentorId);
+          if (!mentor) return null;
+          return (
+            <div style={{marginBottom:16}}>
+              <div style={{background:"rgba(16,185,129,0.06)",border:"1px solid rgba(16,185,129,0.2)",borderRadius:12,padding:"14px 16px",display:"flex",alignItems:"center",gap:12}}>
+                <div style={{width:36,height:36,borderRadius:"50%",background:"linear-gradient(135deg,#10B981,#059669)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,fontWeight:700,color:"white",flexShrink:0}}>{mentor.initials}</div>
+                <div style={{flex:1}}>
+                  <div style={{fontSize:13,fontWeight:600,color:"#E2E8F0"}}>{mentor.name}</div>
+                  <div style={{fontSize:11,color:"#34D399"}}>Your current mentor</div>
+                </div>
+                <span style={{fontSize:9,fontWeight:700,padding:"3px 8px",borderRadius:99,background:"rgba(16,185,129,0.12)",color:"#34D399"}}>Enrolled</span>
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* Teacher list */}
+        <div style={{display:"grid",gap:10}}>
+          {teachers.map(t => (
+            <div key={t.id} onClick={() => setSelectedTeacher(t)}
+              style={{background:t.is_my_mentor?"rgba(16,185,129,0.04)":"rgba(30,41,59,0.4)",border:`1px solid ${t.is_my_mentor?"rgba(16,185,129,0.15)":"rgba(148,163,184,0.07)"}`,borderRadius:12,padding:"16px 18px",cursor:"pointer",transition:"all 0.2s"}}
+              onMouseEnter={e=>{e.currentTarget.style.borderColor=t.is_my_mentor?"rgba(16,185,129,0.3)":"rgba(59,130,246,0.2)";}}
+              onMouseLeave={e=>{e.currentTarget.style.borderColor=t.is_my_mentor?"rgba(16,185,129,0.15)":"rgba(148,163,184,0.07)";}}>
+              <div style={{display:"flex",alignItems:"center",gap:12}}>
+                <div style={{width:42,height:42,borderRadius:"50%",background:`linear-gradient(135deg,${t.color},${t.color}99)`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,fontWeight:700,color:"white",flexShrink:0}}>{t.initials}</div>
+                <div style={{flex:1}}>
+                  <div style={{display:"flex",alignItems:"center",gap:6}}>
+                    <span style={{fontSize:14,fontWeight:600,color:"#E2E8F0"}}>{t.name}</span>
+                    {t.is_my_mentor && <span style={{fontSize:9,fontWeight:700,padding:"1px 6px",borderRadius:99,background:"rgba(16,185,129,0.12)",color:"#34D399"}}>My Mentor</span>}
+                  </div>
+                  <div style={{fontSize:11,color:"#64748B",marginTop:2}}>{t.specialization || "Python Instructor"}</div>
+                  <div style={{display:"flex",gap:10,marginTop:4,fontSize:10,color:"#475569"}}>
+                    <span>{t.student_count} student{t.student_count!==1?"s":""}</span>
+                    {t.experience && <><span>·</span><span>{t.experience}</span></>}
+                  </div>
+                </div>
+                <span style={{fontSize:14,color:"#64748B"}}>→</span>
+              </div>
+            </div>
+          ))}
+          {teachers.length === 0 && <div style={{fontSize:12,color:"#64748B",textAlign:"center",padding:20}}>No teachers available yet.</div>}
+        </div>
+      </div>
+
+      {/* Teacher Profile Modal */}
+      {selectedTeacher && (
+        <div onClick={() => setSelectedTeacher(null)} style={{position:"fixed",inset:0,zIndex:100,background:"rgba(0,0,0,0.7)",backdropFilter:"blur(8px)",display:"flex",alignItems:"center",justifyContent:"center",padding:16,animation:"fadein 0.2s ease"}}>
+          <div onClick={e=>e.stopPropagation()} style={{background:"#0F172A",border:"1px solid rgba(148,163,184,0.15)",borderRadius:18,padding:"28px 24px",maxWidth:480,width:"100%",maxHeight:"80vh",overflowY:"auto",boxShadow:"0 24px 64px -16px rgba(0,0,0,0.6)"}}>
+            {/* Header */}
+            <div style={{display:"flex",alignItems:"center",gap:14,marginBottom:20}}>
+              <div style={{width:56,height:56,borderRadius:"50%",background:`linear-gradient(135deg,${selectedTeacher.color},${selectedTeacher.color}99)`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,fontWeight:700,color:"white",flexShrink:0}}>{selectedTeacher.initials}</div>
+              <div style={{flex:1}}>
+                <div style={{fontSize:18,fontWeight:700,color:"#F1F5F9"}}>{selectedTeacher.name}</div>
+                <div style={{fontSize:12,color:"#64748B"}}>{selectedTeacher.specialization || "Python Instructor"}</div>
+                <div style={{fontSize:11,color:"#475569",marginTop:2}}>{selectedTeacher.student_count} student{selectedTeacher.student_count!==1?"s":""} enrolled</div>
+              </div>
+              <button onClick={() => setSelectedTeacher(null)} style={{width:30,height:30,borderRadius:8,border:"1px solid rgba(148,163,184,0.1)",background:"rgba(30,41,59,0.6)",color:"#94A3B8",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontSize:16}}>x</button>
+            </div>
+
+            {/* Bio */}
+            {selectedTeacher.bio && (
+              <div style={{background:"rgba(30,41,59,0.5)",border:"1px solid rgba(148,163,184,0.07)",borderRadius:10,padding:"14px 16px",marginBottom:12}}>
+                <div style={{fontSize:12,fontWeight:600,color:"#E2E8F0",marginBottom:6}}>About</div>
+                <div style={{fontSize:12,color:"#94A3B8",lineHeight:1.7}}>{selectedTeacher.bio}</div>
+              </div>
+            )}
+
+            {/* Details */}
+            <div style={{display:"grid",gap:8,marginBottom:16}}>
+              {[
+                { label: "Education", value: selectedTeacher.education, icon: "🎓" },
+                { label: "Experience", value: selectedTeacher.experience, icon: "💼" },
+                { label: "Specialization", value: selectedTeacher.specialization, icon: "🎯" },
+                { label: "Achievements", value: selectedTeacher.achievements, icon: "🏆" },
+              ].filter(d => d.value).map(d => (
+                <div key={d.label} style={{background:"rgba(30,41,59,0.5)",border:"1px solid rgba(148,163,184,0.07)",borderRadius:10,padding:"12px 14px",display:"flex",gap:10,alignItems:"flex-start"}}>
+                  <span style={{fontSize:16,flexShrink:0}}>{d.icon}</span>
+                  <div>
+                    <div style={{fontSize:11,fontWeight:600,color:"#64748B",textTransform:"uppercase",letterSpacing:"0.05em",marginBottom:3}}>{d.label}</div>
+                    <div style={{fontSize:12,color:"#CBD5E1",lineHeight:1.6}}>{d.value}</div>
+                  </div>
+                </div>
+              ))}
+              {!selectedTeacher.education && !selectedTeacher.experience && !selectedTeacher.specialization && !selectedTeacher.achievements && !selectedTeacher.bio && (
+                <div style={{fontSize:12,color:"#475569",textAlign:"center",padding:12}}>This teacher hasn't completed their profile yet.</div>
+              )}
+            </div>
+
+            {/* Enroll button — gated behind Pro */}
+            {selectedTeacher.is_my_mentor ? (
+              <div style={{padding:"12px",borderRadius:10,background:"rgba(16,185,129,0.08)",border:"1px solid rgba(16,185,129,0.2)",textAlign:"center"}}>
+                <span style={{fontSize:13,fontWeight:600,color:"#34D399"}}>This is your current mentor ✓</span>
+              </div>
+            ) : (
+              <button onClick={() => { setSelectedTeacher(null); setUpgradeModal(true); }}
+                style={{width:"100%",padding:"12px",borderRadius:10,border:"none",background:"linear-gradient(135deg,#F59E0B,#D97706)",color:"white",fontWeight:600,fontSize:13,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
+                <span>⭐</span> Choose as My Mentor — Pro Only
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Remove Mentor Confirmation Modal */}
+      {removeModal && (() => {
+        const mentor = teachers.find(t => t.id === myMentorId);
+        return (
+          <div onClick={() => setRemoveModal(false)} style={{position:"fixed",inset:0,zIndex:110,background:"rgba(0,0,0,0.7)",backdropFilter:"blur(8px)",display:"flex",alignItems:"center",justifyContent:"center",padding:16,animation:"fadein 0.2s ease"}}>
+            <div onClick={e=>e.stopPropagation()} style={{background:"#0F172A",border:"1px solid rgba(239,68,68,0.2)",borderRadius:18,padding:"28px 24px",maxWidth:420,width:"100%",boxShadow:"0 24px 64px -16px rgba(0,0,0,0.6)"}}>
+              <div style={{fontSize:16,fontWeight:700,color:"#F1F5F9",marginBottom:8}}>Remove {mentor?.name || "Mentor"}?</div>
+              <div style={{fontSize:13,color:"#94A3B8",lineHeight:1.7,marginBottom:20}}>
+                Your enrollment will end in <strong style={{color:"#FBBF24"}}>7 days</strong>. During this period, you can still access their exercises and cancel the removal.
+              </div>
+              <div style={{background:"rgba(245,158,11,0.06)",border:"1px solid rgba(245,158,11,0.15)",borderRadius:10,padding:"12px 14px",marginBottom:20,display:"flex",gap:10,alignItems:"flex-start"}}>
+                <span style={{fontSize:16,flexShrink:0}}>⏳</span>
+                <div style={{fontSize:12,color:"#FBBF24",lineHeight:1.6}}>You can cancel this anytime within the 7-day window from the mentor banner above.</div>
+              </div>
+              <div style={{display:"flex",gap:10}}>
+                <button onClick={() => setRemoveModal(false)} style={{flex:1,padding:"11px",borderRadius:10,border:"1px solid rgba(148,163,184,0.15)",background:"rgba(30,41,59,0.6)",color:"#CBD5E1",fontWeight:600,fontSize:13,cursor:"pointer"}}>
+                  Cancel
+                </button>
+                <button onClick={requestRemoval} disabled={removing} style={{flex:1,padding:"11px",borderRadius:10,border:"none",background:"linear-gradient(135deg,#DC2626,#EF4444)",color:"white",fontWeight:600,fontSize:13,cursor:"pointer",opacity:removing?0.6:1}}>
+                  {removing ? "Removing..." : "Remove in 7 Days"}
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Upgrade to Pro Modal */}
+      {upgradeModal && (
+        <div onClick={() => setUpgradeModal(false)} style={{position:"fixed",inset:0,zIndex:110,background:"rgba(0,0,0,0.75)",backdropFilter:"blur(8px)",display:"flex",alignItems:"center",justifyContent:"center",padding:16,animation:"fadein 0.2s ease"}}>
+          <div onClick={e=>e.stopPropagation()} style={{background:"#0F172A",border:"1px solid rgba(245,158,11,0.25)",borderRadius:18,padding:"32px 28px",maxWidth:440,width:"100%",boxShadow:"0 24px 64px -16px rgba(0,0,0,0.6)",textAlign:"center"}}>
+            <div style={{width:56,height:56,borderRadius:"50%",background:"linear-gradient(135deg,#F59E0B,#D97706)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:26,margin:"0 auto 16px"}}>⭐</div>
+            <div style={{fontSize:18,fontWeight:800,color:"#F1F5F9",marginBottom:6}}>Mentor Access is a Pro Feature</div>
+            <div style={{fontSize:13,color:"#94A3B8",lineHeight:1.7,marginBottom:20}}>Unlock 1-on-1 mentorship with experienced Python instructors to accelerate your learning journey.</div>
+            <div style={{display:"grid",gap:8,marginBottom:24,textAlign:"left"}}>
+              {[
+                { icon: "👨‍🏫", text: "Personalized guidance from expert mentors" },
+                { icon: "📝", text: "Custom exercises tailored to your weak spots" },
+                { icon: "🚀", text: "Priority support when you're stuck" },
+                { icon: "📊", text: "Detailed progress reviews from your mentor" },
+              ].map((f, i) => (
+                <div key={i} style={{display:"flex",alignItems:"center",gap:10,background:"rgba(245,158,11,0.04)",border:"1px solid rgba(245,158,11,0.1)",borderRadius:10,padding:"10px 14px"}}>
+                  <span style={{fontSize:16,flexShrink:0}}>{f.icon}</span>
+                  <span style={{fontSize:12,color:"#CBD5E1",lineHeight:1.5}}>{f.text}</span>
+                </div>
+              ))}
+            </div>
+            <div style={{display:"flex",gap:10}}>
+              <button onClick={() => setUpgradeModal(false)} style={{flex:1,padding:"12px",borderRadius:10,border:"1px solid rgba(148,163,184,0.15)",background:"rgba(30,41,59,0.6)",color:"#94A3B8",fontWeight:600,fontSize:13,cursor:"pointer"}}>
+                Maybe Later
+              </button>
+              <button onClick={() => { setUpgradeModal(false); setToast({ message: "Pro plan coming soon! Stay tuned.", type: "info" }); setTimeout(() => setToast(null), 4000); }} style={{flex:1,padding:"12px",borderRadius:10,border:"none",background:"linear-gradient(135deg,#F59E0B,#D97706)",color:"white",fontWeight:700,fontSize:13,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
+                <span>⭐</span> Upgrade to Pro
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// LEARN PAGE (Sidebar — Students only)
+// ══════════════════════════════════════════════════════════════════════════════
+const LEARN_TOPICS = ["Variables","Data Types","Loops","Lists","Functions","OOP","Error Handling","Libraries"];
+
+const BUILD_ASSIGNMENTS = {
+  "Variables": { title: "Build a Calculator", desc: "Create a calculator that takes two numbers and an operator (+, -, *, /) from the user and displays the result. Handle division by zero.", starter: "# Calculator App\n# Ask user for two numbers and an operator\n# Print the result\n\nnum1 = float(input('Enter first number: '))\noperator = input('Enter operator (+, -, *, /): ')\nnum2 = float(input('Enter second number: '))\n\n# Your code here\n" },
+  "Data Types": { title: "Build a Type Converter", desc: "Create a program that takes user input and converts it to different data types (int, float, string, bool, list). Display the converted values and their types.", starter: "# Type Converter\n# Take input and show conversions\n\nuser_input = input('Enter a value: ')\n\n# Convert and display each type\n# Your code here\n" },
+  "Loops": { title: "Build a Number Guessing Game", desc: "Create a game where the computer picks a random number (1-100) and the player guesses. Give hints (too high/low). Track number of attempts.", starter: "# Number Guessing Game\nimport random\n\nsecret = random.randint(1, 100)\nattempts = 0\n\nprint('I picked a number between 1 and 100!')\n\n# Your game loop here\n" },
+  "Lists": { title: "Build a Contact Book", desc: "Create a contact book that can add, search, delete, and list contacts. Each contact has a name, phone, and email. Use a list of dictionaries.", starter: "# Contact Book\ncontacts = []\n\ndef add_contact(name, phone, email):\n    # Your code here\n    pass\n\ndef search_contact(name):\n    # Your code here\n    pass\n\ndef list_contacts():\n    # Your code here\n    pass\n\n# Test your contact book\nadd_contact('Alice', '555-0101', 'alice@email.com')\nadd_contact('Bob', '555-0102', 'bob@email.com')\nlist_contacts()\nprint(search_contact('Alice'))\n" },
+  "Functions": { title: "Build a Password Generator", desc: "Create a function that generates random passwords with configurable length, uppercase, lowercase, numbers, and special characters. Include a strength checker.", starter: "# Password Generator\nimport random\nimport string\n\ndef generate_password(length=12, uppercase=True, numbers=True, special=True):\n    # Your code here\n    pass\n\ndef check_strength(password):\n    # Return: weak, medium, or strong\n    pass\n\n# Test\npwd = generate_password(16)\nprint(f'Password: {pwd}')\nprint(f'Strength: {check_strength(pwd)}')\n" },
+  "OOP": { title: "Build a Bank Account System", desc: "Create a BankAccount class with deposit, withdraw, transfer methods. Add an InterestAccount subclass. Track transaction history.", starter: "# Bank Account System\n\nclass BankAccount:\n    def __init__(self, owner, balance=0):\n        self.owner = owner\n        self.balance = balance\n        self.history = []\n\n    def deposit(self, amount):\n        # Your code here\n        pass\n\n    def withdraw(self, amount):\n        # Your code here\n        pass\n\n    def transfer(self, other, amount):\n        # Your code here\n        pass\n\nclass InterestAccount(BankAccount):\n    def __init__(self, owner, balance=0, rate=0.05):\n        super().__init__(owner, balance)\n        self.rate = rate\n\n    def apply_interest(self):\n        # Your code here\n        pass\n\n# Test\nacc1 = BankAccount('Alice', 1000)\nacc2 = InterestAccount('Bob', 500)\nacc1.deposit(200)\nacc1.transfer(acc2, 300)\nacc2.apply_interest()\nprint(f'{acc1.owner}: ${acc1.balance}')\nprint(f'{acc2.owner}: ${acc2.balance}')\n" },
+  "Error Handling": { title: "Build a Safe Input Validator", desc: "Create a robust input validator that handles: number parsing, email format, date parsing, age range. Every function must use try/except with specific error types.", starter: "# Safe Input Validator\n\ndef get_number(prompt):\n    # Keep asking until valid number\n    # Handle ValueError\n    pass\n\ndef validate_email(email):\n    # Check format, raise ValueError if invalid\n    pass\n\ndef validate_age(age_str):\n    # Must be int, 0-150 range\n    # Handle ValueError, out of range\n    pass\n\n# Test all validators\ntry:\n    validate_email('test@example.com')\n    print('Email valid!')\n    validate_age('25')\n    print('Age valid!')\n    validate_age('200')\nexcept ValueError as e:\n    print(f'Error: {e}')\n" },
+  "Libraries": { title: "Build a Weather App", desc: "Create a program that uses the json and datetime libraries to process weather data. Parse a JSON weather forecast, display formatted output with dates.", starter: "# Weather App\nimport json\nfrom datetime import datetime, timedelta\n\n# Sample weather data (simulating API response)\nweather_json = '''\n{\n  \"city\": \"San Francisco\",\n  \"forecast\": [\n    {\"date\": \"2024-01-15\", \"temp_high\": 15, \"temp_low\": 8, \"condition\": \"Sunny\"},\n    {\"date\": \"2024-01-16\", \"temp_high\": 13, \"temp_low\": 7, \"condition\": \"Cloudy\"},\n    {\"date\": \"2024-01-17\", \"temp_high\": 11, \"temp_low\": 6, \"condition\": \"Rainy\"}\n  ]\n}\n'''\n\n# Parse and display weather\n# Your code here\n" },
+};
+
+function LearnPage({ user }) {
+  const token = typeof window !== "undefined" ? localStorage.getItem("lf_token") : null;
+  const authHeaders = token ? { Authorization: `Bearer ${token}` } : {};
+  const [topics, setTopics] = useState([]);
+  const [activeTopic, setActiveTopic] = useState(null);
+  const [lesson, setLesson] = useState(null);
+  const [lessonLoading, setLessonLoading] = useState(false);
+  const [activeStep, setActiveStep] = useState("lesson");
+  const [loading, setLoading] = useState(true);
+  const [practiceCode, setPracticeCode] = useState({});
+  const [practiceResults, setPracticeResults] = useState({});
+  const [runningEx, setRunningEx] = useState(null);
+  const [extraExercises, setExtraExercises] = useState([]);
+  const [genDifficulty, setGenDifficulty] = useState("medium");
+  const [generating, setGenerating] = useState(false);
+  const [quizAnswers, setQuizAnswers] = useState({});
+  const [quizSubmitted, setQuizSubmitted] = useState(false);
+  const [quizScore, setQuizScore] = useState(null);
+  const [buildCode, setBuildCode] = useState("");
+  const [buildResult, setBuildResult] = useState(null);
+  const [buildRunning, setBuildRunning] = useState(false);
+  const [toast, setToast] = useState(null);
+
+  const loadStatus = () => {
+    fetch("/api/learn/status", { headers: authHeaders })
+      .then(r => r.json()).then(d => { if (d.topics) setTopics(d.topics); })
+      .catch(() => {}).finally(() => setLoading(false));
+  };
+  useEffect(loadStatus, []);
+
+  const openTopic = (t) => {
+    if (!t.unlocked) return;
+    setActiveTopic(t);
+    setActiveStep(t.current_step === "done" ? "lesson" : t.current_step);
+    setLesson(null);
+    setLessonLoading(true);
+    setPracticeResults({});
+    setPracticeCode({});
+    setExtraExercises([]);
+    setQuizAnswers({});
+    setQuizSubmitted(false);
+    setQuizScore(null);
+    setBuildCode(BUILD_ASSIGNMENTS[t.topic]?.starter || "# Your code here\n");
+    setBuildResult(null);
+    fetch(`/api/learn/topic?topic=${encodeURIComponent(t.topic)}`, { headers: authHeaders })
+      .then(r => r.json()).then(d => { if (d.lesson) setLesson(d.lesson); })
+      .catch(() => {}).finally(() => setLessonLoading(false));
+  };
+
+  const markComplete = async (step) => {
+    await fetch("/api/learn/complete", {
+      method: "POST", headers: { ...authHeaders, "Content-Type": "application/json" },
+      body: JSON.stringify({ topic: activeTopic.topic, step })
+    });
+    loadStatus();
+    setToast({ message: `${step.charAt(0).toUpperCase() + step.slice(1)} completed!`, type: "success" });
+    setTimeout(() => setToast(null), 3000);
+  };
+
+  const runExercise = async (idx) => {
+    const allExercises = [...(lesson?.practice_exercises || []), ...extraExercises];
+    const code = practiceCode[idx] || allExercises[idx]?.starter_code || "";
+    setRunningEx(idx);
+    try {
+      const res = await fetch("/api/execute", {
+        method: "POST", headers: { ...authHeaders, "Content-Type": "application/json" },
+        body: JSON.stringify({ code })
+      });
+      const data = await res.json();
+      setPracticeResults(prev => ({ ...prev, [idx]: { output: data.output || data.error || "No output", success: !data.error } }));
+    } catch { setPracticeResults(prev => ({ ...prev, [idx]: { output: "Execution failed", success: false } })); }
+    setRunningEx(null);
+  };
+
+  const generateMore = async () => {
+    setGenerating(true);
+    try {
+      const res = await fetch("/api/learn/practice", {
+        method: "POST", headers: { ...authHeaders, "Content-Type": "application/json" },
+        body: JSON.stringify({ topic: activeTopic.topic, difficulty: genDifficulty })
+      });
+      const data = await res.json();
+      if (data.exercise) setExtraExercises(prev => [...prev, data.exercise]);
+    } catch {}
+    setGenerating(false);
+  };
+
+  const runBuild = async () => {
+    setBuildRunning(true);
+    try {
+      const res = await fetch("/api/execute", {
+        method: "POST", headers: { ...authHeaders, "Content-Type": "application/json" },
+        body: JSON.stringify({ code: buildCode })
+      });
+      const data = await res.json();
+      setBuildResult({ output: data.output || data.error || "No output", success: !data.error });
+    } catch { setBuildResult({ output: "Execution failed", success: false }); }
+    setBuildRunning(false);
+  };
+
+  if (loading) return <div style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:12}}><LoadingSpinner size={28} color="#3B82F6"/><span style={{fontSize:12,color:"#64748B"}}>Loading learning path...</span></div>;
+
+  // Topic list view
+  if (!activeTopic) {
+    const completed = topics.filter(t => t.completed).length;
+    return (
+      <div style={{flex:1,overflowY:"auto",padding:"20px 14px"}}>
+        {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
+        <div style={{maxWidth:600,margin:"0 auto"}}>
+          <div style={{fontSize:18,fontWeight:800,color:"#F1F5F9",marginBottom:4}}>Learning Path</div>
+          <div style={{fontSize:12,color:"#64748B",marginBottom:16}}>{completed} of {topics.length} topics completed</div>
+          <div style={{display:"flex",gap:4,marginBottom:20,height:6,borderRadius:99,overflow:"hidden",background:"rgba(148,163,184,0.08)"}}>
+            {topics.map((t,i) => (
+              <div key={i} style={{flex:1,background:t.completed?"#10B981":t.unlocked&&!t.completed?"#3B82F6":"transparent",borderRadius:99,transition:"background 0.3s"}}/>
+            ))}
+          </div>
+          <div style={{display:"grid",gap:8}}>
+            {topics.map((t,i) => {
+              const isLocked = !t.unlocked;
+              const isCurrent = t.unlocked && !t.completed;
+              const isDone = t.completed;
+              return (
+                <div key={t.topic} onClick={() => openTopic(t)}
+                  style={{background:isCurrent?"rgba(59,130,246,0.06)":isDone?"rgba(16,185,129,0.04)":"rgba(30,41,59,0.4)",
+                    border:`1px solid ${isCurrent?"rgba(59,130,246,0.2)":isDone?"rgba(16,185,129,0.15)":"rgba(148,163,184,0.07)"}`,
+                    borderRadius:12,padding:"16px 18px",cursor:isLocked?"not-allowed":"pointer",opacity:isLocked?0.5:1,transition:"all 0.2s"}}>
+                  <div style={{display:"flex",alignItems:"center",gap:12}}>
+                    <div style={{width:36,height:36,borderRadius:10,flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,fontWeight:800,
+                      background:isDone?"rgba(16,185,129,0.12)":isCurrent?"rgba(59,130,246,0.12)":"rgba(148,163,184,0.08)",
+                      color:isDone?"#10B981":isCurrent?"#3B82F6":"#475569",border:`1px solid ${isDone?"rgba(16,185,129,0.2)":isCurrent?"rgba(59,130,246,0.2)":"rgba(148,163,184,0.1)"}`}}>
+                      {isDone?"✓":isLocked?"🔒":String(i+1).padStart(2,"0")}
+                    </div>
+                    <div style={{flex:1}}>
+                      <div style={{fontSize:14,fontWeight:600,color:isLocked?"#475569":"#E2E8F0"}}>{t.topic}</div>
+                      <div style={{fontSize:11,color:"#64748B",marginTop:2}}>
+                        {isDone?"Completed":isCurrent?(t.current_step==="lesson"?"Start lesson":"Continue — "+t.current_step):"Complete previous topic to unlock"}
+                      </div>
+                    </div>
+                    <div style={{display:"flex",gap:4}}>
+                      {["lesson","practice","quiz","build"].map(s => (
+                        <div key={s} style={{width:8,height:8,borderRadius:99,background:t[s+"_done"]?"#10B981":isCurrent&&t.current_step===s?"#3B82F6":"rgba(148,163,184,0.15)"}}/>
+                      ))}
+                    </div>
+                    {!isLocked && <span style={{fontSize:14,color:"#64748B"}}>→</span>}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Active topic view
+  const steps = [
+    { id: "lesson", label: "Read", icon: "📖", done: activeTopic.lesson_done },
+    { id: "practice", label: "Practice", icon: "💪", done: activeTopic.practice_done },
+    { id: "quiz", label: "Prove", icon: "🏆", done: activeTopic.quiz_done },
+    { id: "build", label: "Build", icon: "🛠️", done: activeTopic.build_done },
+  ];
+  const stepIdx = steps.findIndex(s => s.id === activeStep);
+
+  return (
+    <div style={{flex:1,overflowY:"auto",padding:"16px 12px",minWidth:0}}>
+      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
+      <div style={{maxWidth:700,margin:"0 auto",minWidth:0}}>
+        {/* Back + Topic header */}
+        <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:16}}>
+          <button onClick={() => { setActiveTopic(null); loadStatus(); }}
+            style={{width:32,height:32,borderRadius:8,border:"1px solid rgba(148,163,184,0.1)",background:"rgba(30,41,59,0.6)",color:"#94A3B8",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontSize:14}}>←</button>
+          <div>
+            <div style={{fontSize:18,fontWeight:800,color:"#F1F5F9"}}>{activeTopic.topic}</div>
+            <div style={{fontSize:11,color:"#64748B"}}>Step {stepIdx+1} of 4 — {steps[stepIdx]?.label}</div>
+          </div>
+        </div>
+
+        {/* Step tabs */}
+        <div style={{display:"flex",gap:6,marginBottom:20}}>
+          {steps.map(s => (
+            <button key={s.id} onClick={() => setActiveStep(s.id)}
+              style={{flex:1,padding:"10px 8px",borderRadius:10,border:`1px solid ${activeStep===s.id?"rgba(59,130,246,0.3)":"rgba(148,163,184,0.07)"}`,
+                background:activeStep===s.id?"rgba(59,130,246,0.08)":"rgba(30,41,59,0.4)",cursor:"pointer",textAlign:"center",transition:"all 0.15s"}}>
+              <div style={{fontSize:16,marginBottom:2}}>{s.done?"✅":s.icon}</div>
+              <div style={{fontSize:11,fontWeight:600,color:activeStep===s.id?"#93C5FD":"#64748B"}}>{s.label}</div>
+            </button>
+          ))}
+        </div>
+
+        {lessonLoading && <div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:12,padding:40}}><LoadingSpinner size={28} color="#3B82F6"/><span style={{fontSize:12,color:"#64748B"}}>Generating lesson...</span></div>}
+
+        {/* ── LESSON STEP ── */}
+        {!lessonLoading && lesson && activeStep === "lesson" && (
+          <div style={{display:"grid",gap:12,minWidth:0}}>
+            <div style={{background:"rgba(30,41,59,0.5)",border:"1px solid rgba(148,163,184,0.07)",borderRadius:12,padding:"14px 16px",minWidth:0}}>
+              <div style={{fontSize:15,fontWeight:700,color:"#F1F5F9",marginBottom:10}}>{lesson.title}</div>
+              <div style={{fontSize:13,color:"#CBD5E1",lineHeight:1.8,whiteSpace:"pre-wrap",wordBreak:"break-word",overflowWrap:"anywhere"}}>{lesson.explanation}</div>
+            </div>
+            <div style={{background:"rgba(30,41,59,0.5)",border:"1px solid rgba(148,163,184,0.07)",borderRadius:12,padding:"14px 16px",minWidth:0}}>
+              <div style={{fontSize:13,fontWeight:700,color:"#FBBF24",marginBottom:8}}>Why It Matters</div>
+              <div style={{fontSize:12,color:"#94A3B8",lineHeight:1.7,wordBreak:"break-word"}}>{lesson.why_it_matters}</div>
+            </div>
+            <div style={{background:"rgba(30,41,59,0.5)",border:"1px solid rgba(59,130,246,0.1)",borderRadius:12,padding:"14px 16px",minWidth:0}}>
+              <div style={{fontSize:13,fontWeight:700,color:"#60A5FA",marginBottom:8}}>Real-World Analogy</div>
+              <div style={{fontSize:12,color:"#94A3B8",lineHeight:1.7,wordBreak:"break-word"}}>{lesson.real_world}</div>
+            </div>
+            {lesson.code_examples?.map((ex, i) => (
+              <div key={i} style={{background:"rgba(30,41,59,0.5)",border:"1px solid rgba(148,163,184,0.07)",borderRadius:12,padding:"14px 16px",minWidth:0}}>
+                <div style={{fontSize:12,fontWeight:600,color:"#E2E8F0",marginBottom:8}}>Example {i+1}: {ex.title}</div>
+                <pre style={{background:"rgba(15,23,42,0.7)",borderRadius:8,padding:"10px 12px",fontSize:11,color:"#93C5FD",overflowX:"auto",marginBottom:8,fontFamily:"monospace",lineHeight:1.6,maxWidth:"100%",whiteSpace:"pre",wordBreak:"normal"}}>{ex.code}</pre>
+                <div style={{fontSize:11,color:"#64748B",wordBreak:"break-word"}}>{ex.explanation}</div>
+              </div>
+            ))}
+            {lesson.key_rules?.length > 0 && (
+              <div style={{background:"rgba(30,41,59,0.5)",border:"1px solid rgba(245,158,11,0.1)",borderRadius:12,padding:"14px 16px",minWidth:0}}>
+                <div style={{fontSize:13,fontWeight:700,color:"#F59E0B",marginBottom:10}}>Key Rules</div>
+                <div style={{display:"grid",gap:6}}>
+                  {lesson.key_rules.map((r, i) => (
+                    <div key={i} style={{display:"flex",gap:8,alignItems:"flex-start"}}>
+                      <span style={{fontSize:11,color:"#F59E0B",flexShrink:0,marginTop:1}}>•</span>
+                      <span style={{fontSize:12,color:"#94A3B8",lineHeight:1.6,wordBreak:"break-word"}}>{r}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            {!activeTopic.lesson_done && (
+              <button onClick={() => { markComplete("lesson"); setActiveStep("practice"); setActiveTopic(prev => ({...prev, lesson_done: true, current_step: "practice"})); }}
+                style={{padding:"12px",borderRadius:10,border:"none",background:"linear-gradient(135deg,#1D4ED8,#2563EB)",color:"white",fontWeight:600,fontSize:13,cursor:"pointer"}}>
+                Mark Lesson Complete & Continue to Practice →
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* ── PRACTICE STEP ── */}
+        {!lessonLoading && lesson && activeStep === "practice" && (
+          <div style={{display:"grid",gap:12,minWidth:0}}>
+            <div style={{fontSize:13,color:"#64748B",marginBottom:4}}>Complete the exercises below. Want more? Generate additional practice at any difficulty.</div>
+            {[...(lesson.practice_exercises || []), ...extraExercises].map((ex, idx) => {
+              const result = practiceResults[idx];
+              const diffColor = ex.difficulty === "easy" ? "#10B981" : ex.difficulty === "medium" ? "#FBBF24" : "#F43F5E";
+              return (
+                <div key={idx} style={{background:"rgba(30,41,59,0.5)",border:"1px solid rgba(148,163,184,0.07)",borderRadius:12,padding:"14px 16px",minWidth:0}}>
+                  <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
+                    <span style={{fontSize:9,fontWeight:700,padding:"2px 8px",borderRadius:99,background:`${diffColor}15`,color:diffColor,textTransform:"uppercase"}}>{ex.difficulty}</span>
+                    <span style={{fontSize:13,fontWeight:600,color:"#E2E8F0"}}>{ex.title}</span>
+                    {idx >= (lesson.practice_exercises?.length || 0) && <span style={{fontSize:9,fontWeight:600,padding:"2px 6px",borderRadius:99,background:"rgba(139,92,246,0.1)",color:"#A78BFA"}}>bonus</span>}
+                  </div>
+                  <div style={{fontSize:12,color:"#94A3B8",marginBottom:10,lineHeight:1.6}}>{ex.description}</div>
+                  <textarea
+                    value={practiceCode[idx] ?? ex.starter_code ?? ""}
+                    onChange={e => setPracticeCode(prev => ({ ...prev, [idx]: e.target.value }))}
+                    style={{width:"100%",maxWidth:"100%",boxSizing:"border-box",minHeight:80,background:"rgba(15,23,42,0.7)",border:"1px solid rgba(148,163,184,0.1)",borderRadius:8,padding:"10px 12px",fontSize:12,color:"#93C5FD",fontFamily:"monospace",resize:"vertical",outline:"none"}}
+                  />
+                  <div style={{display:"flex",gap:8,marginTop:8}}>
+                    <button onClick={() => runExercise(idx)} disabled={runningEx === idx}
+                      style={{padding:"8px 16px",borderRadius:8,border:"none",background:"rgba(59,130,246,0.15)",color:"#60A5FA",fontWeight:600,fontSize:12,cursor:"pointer",opacity:runningEx===idx?0.6:1}}>
+                      {runningEx === idx ? "Running..." : "Run Code"}
+                    </button>
+                  </div>
+                  {result && (
+                    <pre style={{marginTop:8,background:result.success?"rgba(16,185,129,0.06)":"rgba(244,63,94,0.06)",border:`1px solid ${result.success?"rgba(16,185,129,0.15)":"rgba(244,63,94,0.15)"}`,borderRadius:8,padding:"10px 12px",fontSize:11,color:result.success?"#34D399":"#FB7185",fontFamily:"monospace",overflowX:"auto",whiteSpace:"pre-wrap",wordBreak:"break-word",maxWidth:"100%"}}>{result.output}</pre>
+                  )}
+                </div>
+              );
+            })}
+
+            {/* Generate More Practice */}
+            <div style={{background:"rgba(30,41,59,0.5)",border:"1px dashed rgba(139,92,246,0.25)",borderRadius:12,padding:"14px 16px"}}>
+              <div style={{fontSize:13,fontWeight:600,color:"#A78BFA",marginBottom:10}}>Want More Practice?</div>
+              <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
+                <div style={{display:"flex",borderRadius:8,overflow:"hidden",border:"1px solid rgba(148,163,184,0.1)"}}>
+                  {["easy","medium","hard"].map(d => (
+                    <button key={d} onClick={() => setGenDifficulty(d)}
+                      style={{padding:"6px 12px",border:"none",fontSize:11,fontWeight:600,cursor:"pointer",textTransform:"capitalize",
+                        background:genDifficulty===d?"rgba(139,92,246,0.15)":"rgba(30,41,59,0.4)",
+                        color:genDifficulty===d?"#A78BFA":"#64748B"}}>
+                      {d}
+                    </button>
+                  ))}
+                </div>
+                <button onClick={generateMore} disabled={generating}
+                  style={{padding:"7px 16px",borderRadius:8,border:"none",background:"rgba(139,92,246,0.15)",color:"#A78BFA",fontWeight:600,fontSize:12,cursor:"pointer",opacity:generating?0.6:1}}>
+                  {generating ? "Generating..." : "Generate Exercise"}
+                </button>
+              </div>
+            </div>
+
+            {!activeTopic.practice_done && (
+              <button onClick={() => { markComplete("practice"); setActiveStep("quiz"); setActiveTopic(prev => ({...prev, practice_done: true, current_step: "quiz"})); }}
+                style={{padding:"12px",borderRadius:10,border:"none",background:"linear-gradient(135deg,#1D4ED8,#2563EB)",color:"white",fontWeight:600,fontSize:13,cursor:"pointer"}}>
+                Mark Practice Complete & Continue to Quiz →
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* ── QUIZ STEP ── */}
+        {!lessonLoading && lesson && activeStep === "quiz" && (
+          <div style={{display:"grid",gap:12,minWidth:0}}>
+            <div style={{fontSize:13,color:"#64748B",marginBottom:4}}>Answer these questions to prove your understanding. Score 70%+ to proceed to the final build.</div>
+            {(lesson.key_rules || []).map((rule, idx) => {
+              const isCorrect = quizSubmitted && quizAnswers[idx] === "true";
+              return (
+                <div key={idx} style={{background:"rgba(30,41,59,0.5)",border:`1px solid ${quizSubmitted?(isCorrect?"rgba(16,185,129,0.2)":"rgba(244,63,94,0.2)"):"rgba(148,163,184,0.07)"}`,borderRadius:12,padding:"14px 16px",minWidth:0}}>
+                  <div style={{fontSize:13,fontWeight:600,color:"#E2E8F0",marginBottom:10}}>Q{idx+1}: Is this statement true about {activeTopic.topic}?</div>
+                  <div style={{fontSize:12,color:"#CBD5E1",marginBottom:12,padding:"8px 12px",background:"rgba(15,23,42,0.5)",borderRadius:8,fontStyle:"italic"}}>"{rule}"</div>
+                  <div style={{display:"flex",gap:8}}>
+                    {["true","false"].map(opt => (
+                      <button key={opt} onClick={() => !quizSubmitted && setQuizAnswers(prev => ({...prev, [idx]: opt}))}
+                        style={{flex:1,padding:"8px",borderRadius:8,border:`1px solid ${quizAnswers[idx]===opt?"rgba(59,130,246,0.3)":"rgba(148,163,184,0.1)"}`,
+                          background:quizAnswers[idx]===opt?"rgba(59,130,246,0.1)":"rgba(30,41,59,0.4)",color:quizAnswers[idx]===opt?"#93C5FD":"#64748B",
+                          fontWeight:600,fontSize:12,cursor:quizSubmitted?"default":"pointer",textTransform:"capitalize"}}>
+                        {opt === "true" ? "True" : "False"}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+            {!quizSubmitted ? (
+              <button onClick={() => {
+                const total = (lesson.key_rules || []).length;
+                const correct = Object.values(quizAnswers).filter(a => a === "true").length;
+                const score = total > 0 ? Math.round((correct / total) * 100) : 0;
+                setQuizScore(score);
+                setQuizSubmitted(true);
+                if (score >= 70) {
+                  markComplete("quiz");
+                  setActiveTopic(prev => ({...prev, quiz_done: true, current_step: "build"}));
+                }
+              }}
+                disabled={Object.keys(quizAnswers).length < (lesson.key_rules || []).length}
+                style={{padding:"12px",borderRadius:10,border:"none",background:Object.keys(quizAnswers).length<(lesson.key_rules||[]).length?"rgba(148,163,184,0.1)":"linear-gradient(135deg,#1D4ED8,#2563EB)",
+                  color:Object.keys(quizAnswers).length<(lesson.key_rules||[]).length?"#475569":"white",fontWeight:600,fontSize:13,cursor:Object.keys(quizAnswers).length<(lesson.key_rules||[]).length?"not-allowed":"pointer"}}>
+                Submit Quiz
+              </button>
+            ) : (
+              <div style={{background:quizScore>=70?"rgba(16,185,129,0.06)":"rgba(244,63,94,0.06)",border:`1px solid ${quizScore>=70?"rgba(16,185,129,0.2)":"rgba(244,63,94,0.2)"}`,borderRadius:12,padding:"18px 20px",textAlign:"center"}}>
+                <div style={{fontSize:28,fontWeight:800,color:quizScore>=70?"#10B981":"#F43F5E",marginBottom:6}}>{quizScore}%</div>
+                <div style={{fontSize:13,color:quizScore>=70?"#34D399":"#FB7185",fontWeight:600}}>
+                  {quizScore >= 70 ? "Passed! Continue to the Build challenge." : "Not quite — review the lesson and try again."}
+                </div>
+                {quizScore < 70 && (
+                  <button onClick={() => { setQuizAnswers({}); setQuizSubmitted(false); setQuizScore(null); }}
+                    style={{marginTop:12,padding:"8px 20px",borderRadius:8,border:"none",background:"rgba(244,63,94,0.12)",color:"#FB7185",fontWeight:600,fontSize:12,cursor:"pointer"}}>
+                    Retry Quiz
+                  </button>
+                )}
+                {quizScore >= 70 && (
+                  <button onClick={() => setActiveStep("build")}
+                    style={{marginTop:12,padding:"8px 20px",borderRadius:8,border:"none",background:"rgba(16,185,129,0.12)",color:"#34D399",fontWeight:600,fontSize:12,cursor:"pointer"}}>
+                    Continue to Build →
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── BUILD STEP ── */}
+        {!lessonLoading && activeStep === "build" && (() => {
+          const assignment = BUILD_ASSIGNMENTS[activeTopic.topic];
+          if (!assignment) return <div style={{color:"#64748B",textAlign:"center",padding:40}}>No build assignment for this topic yet.</div>;
+          return (
+            <div style={{display:"grid",gap:12,minWidth:0}}>
+              <div style={{background:"linear-gradient(135deg,rgba(139,92,246,0.08),rgba(59,130,246,0.08))",border:"1px solid rgba(139,92,246,0.2)",borderRadius:12,padding:"16px 16px",minWidth:0}}>
+                <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
+                  <span style={{fontSize:20}}>🛠️</span>
+                  <div style={{minWidth:0}}>
+                    <div style={{fontSize:15,fontWeight:700,color:"#F1F5F9"}}>{assignment.title}</div>
+                    <div style={{fontSize:11,color:"#A78BFA",fontWeight:600}}>Final Project — {activeTopic.topic}</div>
+                  </div>
+                </div>
+                <div style={{fontSize:13,color:"#CBD5E1",lineHeight:1.7,marginTop:8,wordBreak:"break-word"}}>{assignment.desc}</div>
+              </div>
+
+              <div style={{background:"rgba(30,41,59,0.5)",border:"1px solid rgba(148,163,184,0.07)",borderRadius:12,padding:"14px 16px",minWidth:0}}>
+                <div style={{fontSize:12,fontWeight:600,color:"#E2E8F0",marginBottom:8}}>Your Code</div>
+                <textarea
+                  value={buildCode}
+                  onChange={e => setBuildCode(e.target.value)}
+                  style={{width:"100%",maxWidth:"100%",boxSizing:"border-box",minHeight:160,background:"rgba(15,23,42,0.7)",border:"1px solid rgba(148,163,184,0.1)",borderRadius:8,padding:"10px 12px",fontSize:12,color:"#93C5FD",fontFamily:"monospace",resize:"vertical",outline:"none",lineHeight:1.6}}
+                />
+                <div style={{display:"flex",gap:8,marginTop:10,flexWrap:"wrap"}}>
+                  <button onClick={runBuild} disabled={buildRunning}
+                    style={{padding:"8px 16px",borderRadius:8,border:"none",background:"rgba(59,130,246,0.15)",color:"#60A5FA",fontWeight:600,fontSize:12,cursor:"pointer",opacity:buildRunning?0.6:1}}>
+                    {buildRunning ? "Running..." : "Run Code"}
+                  </button>
+                  {!activeTopic.build_done && (
+                    <button onClick={() => { markComplete("build"); setActiveTopic(prev => ({...prev, build_done: true, current_step: "done", completed: true})); }}
+                      style={{padding:"8px 16px",borderRadius:8,border:"none",background:"linear-gradient(135deg,#059669,#10B981)",color:"white",fontWeight:600,fontSize:12,cursor:"pointer"}}>
+                      Submit & Complete Topic
+                    </button>
+                  )}
+                </div>
+                {buildResult && (
+                  <pre style={{marginTop:10,background:buildResult.success?"rgba(16,185,129,0.06)":"rgba(244,63,94,0.06)",border:`1px solid ${buildResult.success?"rgba(16,185,129,0.15)":"rgba(244,63,94,0.15)"}`,borderRadius:8,padding:"10px 12px",fontSize:11,color:buildResult.success?"#34D399":"#FB7185",fontFamily:"monospace",overflowX:"auto",whiteSpace:"pre-wrap",wordBreak:"break-word",maxWidth:"100%"}}>{buildResult.output}</pre>
+                )}
+              </div>
+
+              {activeTopic.build_done && (
+                <div style={{background:"rgba(16,185,129,0.06)",border:"1px solid rgba(16,185,129,0.2)",borderRadius:12,padding:"14px 16px",textAlign:"center"}}>
+                  <div style={{fontSize:24,marginBottom:6}}>🎉</div>
+                  <div style={{fontSize:16,fontWeight:700,color:"#10B981",marginBottom:4}}>Topic Complete!</div>
+                  <div style={{fontSize:12,color:"#34D399",marginBottom:12}}>You've mastered {activeTopic.topic}. The next topic is now unlocked.</div>
+                  <button onClick={() => { setActiveTopic(null); loadStatus(); }}
+                    style={{padding:"8px 24px",borderRadius:8,border:"none",background:"rgba(16,185,129,0.12)",color:"#34D399",fontWeight:600,fontSize:12,cursor:"pointer"}}>
+                    Back to Learning Path
+                  </button>
+                </div>
+              )}
+            </div>
+          );
+        })()}
+      </div>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// SNIPPETS PAGE (Sidebar)
+// ══════════════════════════════════════════════════════════════════════════════
+function SnippetsPage({ user, onLoadSnippet }) {
+  const [snippets, setSnippets] = useState([]);
+  const [starters, setStarters] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
+  const [tab, setTab] = useState("mine"); // mine | starters
+  const [toast, setToast] = useState(null);
+  const [expanded, setExpanded] = useState(null);
+  const authHeaders = { Authorization: `Bearer ${typeof window!=="undefined"?localStorage.getItem("lf_token")||"":""}` };
+
+  const load = () => {
+    fetch("/api/snippets", { headers: authHeaders })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d) { setSnippets(d.snippets||[]); setStarters(d.starters||[]); }})
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  };
+  useEffect(() => { load(); }, []);
+
+  const toggleStar = async (id) => {
+    await fetch("/api/snippets", { method:"PATCH", headers:{"Content-Type":"application/json",...authHeaders}, body:JSON.stringify({id}) });
+    setSnippets(prev => prev.map(s => s.id===id ? {...s, starred:!s.starred} : s));
+  };
+
+  const deleteSnippet = async (id) => {
+    await fetch("/api/snippets", { method:"DELETE", headers:{"Content-Type":"application/json",...authHeaders}, body:JSON.stringify({id}) });
+    setSnippets(prev => prev.filter(s => s.id!==id));
+    setToast({message:"Snippet deleted",type:"info"});
+  };
+
+  const copyCode = (code) => {
+    navigator.clipboard.writeText(code).then(()=>setToast({message:"Copied to clipboard!",type:"success"})).catch(()=>setToast({message:"Copy failed",type:"error"}));
+  };
+
+  const items = tab==="mine" ? snippets : starters;
+  const filtered = search.trim()
+    ? items.filter(s => s.title.toLowerCase().includes(search.toLowerCase()) || (s.tags||"").toLowerCase().includes(search.toLowerCase()) || (s.description||"").toLowerCase().includes(search.toLowerCase()))
+    : items;
+
+  return (
+    <div style={{flex:1,overflowY:"auto",padding:"20px 14px"}}>
+      {toast&&<Toast message={toast.message} type={toast.type} onClose={()=>setToast(null)}/>}
+      <div style={{maxWidth:640,margin:"0 auto"}}>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16}}>
+          <div>
+            <div style={{fontSize:20,fontWeight:800,color:"#F1F5F9"}}>Code Snippets</div>
+            <div style={{fontSize:12,color:"#64748B",marginTop:2}}>{snippets.length} saved · {starters.length} starter templates</div>
+          </div>
+        </div>
+
+        {/* Tabs */}
+        <div style={{display:"flex",gap:0,marginBottom:16,background:"rgba(30,41,59,0.6)",borderRadius:10,border:"1px solid rgba(148,163,184,0.08)",overflow:"hidden"}}>
+          {[{id:"mine",label:`My Snippets (${snippets.length})`},{id:"starters",label:`Starter Templates (${starters.length})`}].map(t=>(
+            <button key={t.id} onClick={()=>setTab(t.id)} style={{flex:1,padding:"9px 14px",border:"none",background:tab===t.id?"rgba(139,92,246,0.12)":"transparent",color:tab===t.id?"#A78BFA":"#64748B",fontSize:12,fontWeight:tab===t.id?700:500,cursor:"pointer",transition:"all 0.15s"}}>{t.label}</button>
+          ))}
+        </div>
+
+        {/* Search */}
+        <div style={{position:"relative",marginBottom:16}}>
+          <svg viewBox="0 0 24 24" fill="none" stroke="#475569" strokeWidth="2" style={{width:14,height:14,position:"absolute",left:12,top:"50%",transform:"translateY(-50%)"}}><path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z"/></svg>
+          <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search by title, tags, description..."
+            style={{width:"100%",padding:"10px 12px 10px 34px",background:"rgba(30,41,59,0.5)",border:"1px solid rgba(148,163,184,0.1)",borderRadius:10,fontSize:13,color:"#E2E8F0",outline:"none",fontFamily:"inherit"}}/>
+          {search && <button onClick={()=>setSearch("")} style={{position:"absolute",right:10,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",color:"#64748B",cursor:"pointer",fontSize:14}}>x</button>}
+        </div>
+
+        {loading ? <LoadingSpinner /> : filtered.length === 0 ? (
+          <div style={{textAlign:"center",padding:"48px 20px",color:"#475569"}}>
+            <div style={{fontSize:32,marginBottom:8}}>{search?"🔍":"📌"}</div>
+            <div style={{fontSize:14,fontWeight:600,color:"#64748B",marginBottom:4}}>{search?"No snippets match your search":tab==="mine"?"No saved snippets yet":"No starter templates"}</div>
+            <div style={{fontSize:12,color:"#475569"}}>{tab==="mine"?"Save code from the editor using the Save button":"Check back later for templates"}</div>
+          </div>
+        ) : (
+          <div style={{display:"flex",flexDirection:"column",gap:8}}>
+            {filtered.map(s => {
+              const isExp = expanded === (s.id);
+              const tags = (s.tags||"").split(",").map(t=>t.trim()).filter(Boolean);
+              return (
+                <div key={s.id} style={{background:"rgba(30,41,59,0.4)",border:`1px solid ${isExp?"rgba(139,92,246,0.2)":"rgba(148,163,184,0.07)"}`,borderRadius:12,overflow:"hidden",transition:"border-color 0.2s"}}>
+                  <div onClick={()=>setExpanded(isExp?null:s.id)} style={{display:"flex",alignItems:"center",gap:10,padding:"12px 14px",cursor:"pointer"}}
+                    onMouseEnter={e=>{e.currentTarget.style.background="rgba(148,163,184,0.03)";}}
+                    onMouseLeave={e=>{e.currentTarget.style.background="transparent";}}>
+                    {tab==="mine"&&!s.is_starter&&(
+                      <button onClick={e=>{e.stopPropagation();toggleStar(s.id);}} style={{background:"none",border:"none",cursor:"pointer",fontSize:16,padding:0,flexShrink:0}}>
+                        {s.starred?"⭐":"☆"}
+                      </button>
+                    )}
+                    {s.is_starter&&<span style={{fontSize:16,flexShrink:0}}>📦</span>}
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{display:"flex",alignItems:"center",gap:6}}>
+                        <span style={{fontSize:13,fontWeight:600,color:"#E2E8F0"}}>{s.title}</span>
+                        {s.starred&&<span style={{fontSize:9,fontWeight:700,padding:"1px 5px",borderRadius:99,color:"#F59E0B",background:"rgba(245,158,11,0.1)"}}>STARRED</span>}
+                      </div>
+                      {s.description&&<div style={{fontSize:11,color:"#64748B",marginTop:2}}>{s.description}</div>}
+                      {tags.length>0&&(
+                        <div style={{display:"flex",gap:4,marginTop:4,flexWrap:"wrap"}}>
+                          {tags.map(t=><span key={t} style={{fontSize:9,padding:"1px 6px",borderRadius:99,background:"rgba(139,92,246,0.08)",border:"1px solid rgba(139,92,246,0.15)",color:"#A78BFA",fontWeight:600}}>{t}</span>)}
+                        </div>
+                      )}
+                    </div>
+                    <span style={{fontSize:11,color:"#475569",transition:"transform 0.2s",transform:isExp?"rotate(180deg)":"rotate(0)",flexShrink:0}}>▼</span>
+                  </div>
+                  {isExp && (
+                    <div style={{borderTop:"1px solid rgba(148,163,184,0.05)",padding:"12px 14px"}}>
+                      <pre style={{padding:"12px 14px",background:"rgba(15,23,42,0.7)",border:"1px solid rgba(148,163,184,0.08)",borderRadius:8,fontSize:12,color:"#93C5FD",fontFamily:"'Fira Code',monospace",overflow:"auto",lineHeight:1.6,maxHeight:200,marginBottom:10}}>{s.code}</pre>
+                      <div style={{display:"flex",gap:8}}>
+                        <button onClick={()=>{onLoadSnippet(s.code);setToast({message:`"${s.title}" loaded into editor`,type:"success"});}}
+                          style={{flex:1,padding:"8px",borderRadius:8,border:"none",background:"linear-gradient(135deg,#7C3AED,#8B5CF6)",color:"white",fontSize:12,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:5}}>
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{width:12,height:12}}><path strokeLinecap="round" strokeLinejoin="round" d="M17.25 8.25L21 12m0 0l-3.75 3.75M21 12H3"/></svg>
+                          Load in Editor
+                        </button>
+                        <button onClick={()=>copyCode(s.code)}
+                          style={{padding:"8px 14px",borderRadius:8,border:"1px solid rgba(148,163,184,0.15)",background:"transparent",color:"#94A3B8",fontSize:12,fontWeight:600,cursor:"pointer",display:"flex",alignItems:"center",gap:4}}>
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{width:12,height:12}}><path strokeLinecap="round" strokeLinejoin="round" d="M15.666 3.888A2.25 2.25 0 0013.5 2.25h-3c-1.03 0-1.9.693-2.166 1.638m7.332 0c.055.194.084.4.084.612v0a.75.75 0 01-.75.75H9.75a.75.75 0 01-.75-.75v0c0-.212.03-.418.084-.612m7.332 0c.646.049 1.288.11 1.927.184 1.1.128 1.907 1.077 1.907 2.185V19.5a2.25 2.25 0 01-2.25 2.25H6.75A2.25 2.25 0 014.5 19.5V6.257c0-1.108.806-2.057 1.907-2.185a48.208 48.208 0 011.927-.184"/></svg>
+                          Copy
+                        </button>
+                        {tab==="mine"&&!s.is_starter&&(
+                          <button onClick={()=>deleteSnippet(s.id)}
+                            style={{padding:"8px 14px",borderRadius:8,border:"1px solid rgba(244,63,94,0.15)",background:"rgba(244,63,94,0.06)",color:"#FB7185",fontSize:12,fontWeight:600,cursor:"pointer"}}>
+                            Delete
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// CHAT HISTORY PAGE (Sidebar)
+// ══════════════════════════════════════════════════════════════════════════════
+function ChatHistoryPage({ user }) {
+  const [messages, setMessages] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
+  const [expandedDay, setExpandedDay] = useState(null);
+  const authHeaders = { Authorization: `Bearer ${typeof window!=="undefined"?localStorage.getItem("lf_token")||"":""}` };
+
+  useEffect(() => {
+    fetch("/api/chat/history", { headers: authHeaders })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d && d.messages) setMessages(d.messages); })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
+  const filtered = search.trim()
+    ? messages.filter(m => m.text.toLowerCase().includes(search.toLowerCase()) || (m.agent||"").toLowerCase().includes(search.toLowerCase()))
+    : messages;
+
+  // Group by date
+  const grouped = {};
+  filtered.forEach(m => {
+    const d = new Date(m.created_at);
+    const key = d.toLocaleDateString("en-US", { weekday:"long", year:"numeric", month:"long", day:"numeric" });
+    if (!grouped[key]) grouped[key] = [];
+    grouped[key].push(m);
+  });
+  const days = Object.keys(grouped).reverse(); // newest first
+
+  const totalUser = messages.filter(m => m.role === "user").length;
+  const totalAI = messages.filter(m => m.role !== "user").length;
+  const agents = [...new Set(messages.filter(m => m.agent).map(m => m.agent))];
+
+  // Auto-expand first day
+  useEffect(() => { if (days.length > 0 && !expandedDay) setExpandedDay(days[0]); }, [days.length]);
+
+  return (
+    <div style={{flex:1,overflowY:"auto",padding:"20px 14px"}}>
+      <div style={{maxWidth:640,margin:"0 auto"}}>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16}}>
+          <div>
+            <div style={{fontSize:20,fontWeight:800,color:"#F1F5F9"}}>Chat History</div>
+            <div style={{fontSize:12,color:"#64748B",marginTop:2}}>{messages.length} messages across {days.length} day{days.length!==1?"s":""}</div>
+          </div>
+        </div>
+
+        {/* Stats */}
+        <div style={{display:"flex",gap:8,marginBottom:16,flexWrap:"wrap"}}>
+          {[
+            {emoji:"💬",label:"Your Messages",value:totalUser},
+            {emoji:"🤖",label:"AI Responses",value:totalAI},
+            {emoji:"🧠",label:"Agents Used",value:agents.length},
+          ].map(s=>(
+            <div key={s.label} style={{flex:1,minWidth:100,background:"rgba(30,41,59,0.4)",border:"1px solid rgba(148,163,184,0.07)",borderRadius:10,padding:"10px 12px",textAlign:"center"}}>
+              <div style={{fontSize:16}}>{s.emoji}</div>
+              <div style={{fontSize:16,fontWeight:800,color:"#E2E8F0"}}>{s.value}</div>
+              <div style={{fontSize:10,color:"#475569"}}>{s.label}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* Search */}
+        <div style={{position:"relative",marginBottom:16}}>
+          <svg viewBox="0 0 24 24" fill="none" stroke="#475569" strokeWidth="2" style={{width:14,height:14,position:"absolute",left:12,top:"50%",transform:"translateY(-50%)"}}><path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z"/></svg>
+          <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search messages, agents..."
+            style={{width:"100%",padding:"10px 12px 10px 34px",background:"rgba(30,41,59,0.5)",border:"1px solid rgba(148,163,184,0.1)",borderRadius:10,fontSize:13,color:"#E2E8F0",outline:"none",fontFamily:"inherit"}}/>
+          {search && <button onClick={()=>setSearch("")} style={{position:"absolute",right:10,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",color:"#64748B",cursor:"pointer",fontSize:14}}>x</button>}
+        </div>
+
+        {loading ? <LoadingSpinner /> : filtered.length === 0 ? (
+          <div style={{textAlign:"center",padding:"48px 20px",color:"#475569"}}>
+            <div style={{fontSize:32,marginBottom:8}}>{search?"🔍":"💬"}</div>
+            <div style={{fontSize:14,fontWeight:600,color:"#64748B",marginBottom:4}}>{search?"No messages match your search":"No chat history yet"}</div>
+            <div style={{fontSize:12,color:"#475569"}}>{search?"Try different keywords":"Start a conversation in the Dashboard to see your history here"}</div>
+          </div>
+        ) : (
+          <div style={{display:"flex",flexDirection:"column",gap:6}}>
+            {days.map(day => {
+              const dayMsgs = grouped[day];
+              const isExpanded = expandedDay === day;
+              const userCount = dayMsgs.filter(m=>m.role==="user").length;
+              const aiCount = dayMsgs.length - userCount;
+              return (
+                <div key={day} style={{background:"rgba(30,41,59,0.4)",border:"1px solid rgba(148,163,184,0.07)",borderRadius:12,overflow:"hidden"}}>
+                  <div onClick={()=>setExpandedDay(isExpanded?null:day)}
+                    style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"12px 16px",cursor:"pointer",transition:"background 0.15s"}}
+                    onMouseEnter={e=>{e.currentTarget.style.background="rgba(148,163,184,0.04)";}}
+                    onMouseLeave={e=>{e.currentTarget.style.background="transparent";}}>
+                    <div style={{display:"flex",alignItems:"center",gap:10}}>
+                      <span style={{fontSize:14}}>📅</span>
+                      <div>
+                        <div style={{fontSize:13,fontWeight:600,color:"#E2E8F0"}}>{day}</div>
+                        <div style={{fontSize:11,color:"#64748B"}}>{userCount} sent · {aiCount} received</div>
+                      </div>
+                    </div>
+                    <span style={{fontSize:11,color:"#475569",transition:"transform 0.2s",transform:isExpanded?"rotate(180deg)":"rotate(0)"}}>▼</span>
+                  </div>
+                  {isExpanded && (
+                    <div style={{borderTop:"1px solid rgba(148,163,184,0.05)",padding:"12px 16px",display:"flex",flexDirection:"column",gap:8}}>
+                      {dayMsgs.map(m => {
+                        const isUser = m.role === "user";
+                        const time = new Date(m.created_at).toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"});
+                        return (
+                          <div key={m.id} style={{display:"flex",gap:10,alignItems:"flex-start",flexDirection:isUser?"row-reverse":"row"}}>
+                            <div style={{width:28,height:28,borderRadius:8,flexShrink:0,background:isUser?"linear-gradient(135deg,#1D4ED8,#3B82F6)":"rgba(59,130,246,0.12)",border:isUser?"none":"1px solid rgba(59,130,246,0.2)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,color:"white"}}>
+                              {isUser?(user?.name?user.name[0].toUpperCase():"U"):"🤖"}
+                            </div>
+                            <div style={{flex:1,minWidth:0,maxWidth:"80%"}}>
+                              <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:3,flexDirection:isUser?"row-reverse":"row"}}>
+                                <span style={{fontSize:11,fontWeight:600,color:isUser?"#60A5FA":"#94A3B8"}}>{isUser?(user?.name||"You"):(m.agent||"AI Tutor")}</span>
+                                <span style={{fontSize:10,color:"#334155"}}>{time}</span>
+                              </div>
+                              <div style={{padding:"8px 12px",borderRadius:isUser?"14px 14px 4px 14px":"4px 14px 14px 14px",fontSize:13,lineHeight:1.6,color:isUser?"#EFF6FF":"#CBD5E1",background:isUser?"linear-gradient(135deg,#1D4ED8,#3B82F6)":"rgba(30,41,59,0.7)",border:isUser?"none":"1px solid rgba(148,163,184,0.07)",wordBreak:"break-word"}}>
+                                {m.text.length > 300 ? m.text.slice(0,300)+"..." : m.text}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// LEADERBOARD PAGE (Sidebar)
+// ══════════════════════════════════════════════════════════════════════════════
+function LeaderboardPage({ user }) {
+  const [period, setPeriod] = useState("all");
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const authHeaders = { Authorization: `Bearer ${typeof window!=="undefined"?localStorage.getItem("lf_token")||"":""}` };
+
+  const load = (p) => {
+    setLoading(true);
+    fetch(`/api/leaderboard?period=${p}`, { headers: authHeaders })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d) setData(d); })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(() => { load(period); }, [period]);
+
+  const podiumColors = ["#F59E0B","#94A3B8","#CD7F32"]; // gold, silver, bronze
+  const podiumBg = ["rgba(245,158,11,0.08)","rgba(148,163,184,0.06)","rgba(205,127,50,0.06)"];
+  const podiumBorder = ["rgba(245,158,11,0.25)","rgba(148,163,184,0.15)","rgba(205,127,50,0.2)"];
+  const medals = ["🥇","🥈","🥉"];
+
+  return (
+    <div style={{flex:1,overflowY:"auto",padding:"20px 14px"}}>
+      <div style={{maxWidth:600,margin:"0 auto"}}>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:20}}>
+          <div>
+            <div style={{fontSize:20,fontWeight:800,color:"#F1F5F9"}}>Leaderboard</div>
+            <div style={{fontSize:12,color:"#64748B",marginTop:2}}>See how you rank among all students</div>
+          </div>
+          <div style={{display:"flex",background:"rgba(30,41,59,0.6)",borderRadius:10,border:"1px solid rgba(148,163,184,0.08)",overflow:"hidden"}}>
+            {[{id:"all",label:"All Time"},{id:"weekly",label:"This Week"}].map(t=>(
+              <button key={t.id} onClick={()=>setPeriod(t.id)} style={{padding:"7px 14px",border:"none",background:period===t.id?"rgba(59,130,246,0.15)":"transparent",color:period===t.id?"#60A5FA":"#64748B",fontSize:12,fontWeight:period===t.id?700:500,cursor:"pointer",transition:"all 0.15s"}}>{t.label}</button>
+            ))}
+          </div>
+        </div>
+
+        {loading ? <LoadingSpinner /> : !data || data.leaderboard.length === 0 ? (
+          <div style={{textAlign:"center",padding:"60px 20px",color:"#475569",fontSize:13}}>No students have started learning yet. Be the first!</div>
+        ) : (
+          <>
+            {/* Podium — Top 3 */}
+            {data.leaderboard.length >= 3 && (
+              <div style={{display:"flex",alignItems:"flex-end",justifyContent:"center",gap:8,marginBottom:24,padding:"10px 0"}}>
+                {[1,0,2].map(idx => {
+                  const s = data.leaderboard[idx];
+                  if (!s) return null;
+                  const isCenter = idx === 0;
+                  const h = isCenter ? 120 : 95;
+                  return (
+                    <div key={s.id} style={{display:"flex",flexDirection:"column",alignItems:"center",flex:isCenter?"1.3 1 0":"1 1 0",minWidth:0,maxWidth:isCenter?140:110}}>
+                      <div style={{fontSize:isCenter?28:22,marginBottom:4}}>{medals[idx]}</div>
+                      <div style={{width:isCenter?52:42,height:isCenter?52:42,borderRadius:"50%",background:`linear-gradient(135deg,${s.color},${s.color}99)`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:isCenter?18:14,fontWeight:800,color:"white",border:`3px solid ${podiumColors[idx]}`,marginBottom:6}}>{s.initials}</div>
+                      <div style={{fontSize:isCenter?14:12,fontWeight:700,color:"#E2E8F0",textAlign:"center",marginBottom:2,maxWidth:"100%",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{s.name}{s.is_me?" (You)":""}</div>
+                      <div style={{fontSize:isCenter?20:16,fontWeight:800,color:podiumColors[idx],marginBottom:4}}>{s.avg_mastery}%</div>
+                      <div style={{width:"100%",height:h,background:podiumBg[idx],border:`1px solid ${podiumBorder[idx]}`,borderRadius:"12px 12px 0 0",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:4}}>
+                        <div style={{fontSize:10,color:"#94A3B8"}}>🔥 {s.streak}d streak</div>
+                        <div style={{fontSize:10,color:"#94A3B8"}}>{s.topics_started} topics</div>
+                        <div style={{fontSize:10,color:"#94A3B8"}}>{s.code_runs} runs</div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* My Rank Card (if not in top 3) */}
+            {data.my_rank && data.my_rank.rank > 3 && (
+              <div style={{background:"rgba(59,130,246,0.06)",border:"1px solid rgba(59,130,246,0.2)",borderRadius:12,padding:"14px 16px",marginBottom:16,display:"flex",alignItems:"center",gap:12}}>
+                <div style={{fontSize:12,fontWeight:800,color:"#60A5FA",width:28,textAlign:"center"}}>#{data.my_rank.rank}</div>
+                <div style={{width:36,height:36,borderRadius:"50%",background:"linear-gradient(135deg,#3B82F6,#6366F1)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:700,color:"white"}}>{data.my_rank.initials}</div>
+                <div style={{flex:1}}>
+                  <div style={{fontSize:13,fontWeight:700,color:"#E2E8F0"}}>{data.my_rank.name} (You)</div>
+                  <div style={{fontSize:11,color:"#64748B"}}>{data.my_rank.streak}d streak  ·  {data.my_rank.topics_started} topics  ·  {data.my_rank.code_runs} runs</div>
+                </div>
+                <div style={{fontSize:18,fontWeight:800,color:"#60A5FA"}}>{data.my_rank.avg_mastery}%</div>
+              </div>
+            )}
+
+            {/* Full Rankings List */}
+            <div style={{background:"rgba(30,41,59,0.4)",border:"1px solid rgba(148,163,184,0.07)",borderRadius:14,overflow:"hidden"}}>
+              <div style={{display:"flex",alignItems:"center",padding:"12px 16px",borderBottom:"1px solid rgba(148,163,184,0.07)",fontSize:10,fontWeight:700,color:"#475569",textTransform:"uppercase",letterSpacing:"0.05em"}}>
+                <span style={{width:36}}>Rank</span>
+                <span style={{flex:1}}>Student</span>
+                <span style={{width:60,textAlign:"center"}}>Streak</span>
+                <span style={{width:60,textAlign:"center"}}>Topics</span>
+                <span style={{width:50,textAlign:"center"}}>Runs</span>
+                <span style={{width:60,textAlign:"right"}}>Mastery</span>
+              </div>
+              {data.leaderboard.map((s, i) => (
+                <div key={s.id} style={{display:"flex",alignItems:"center",padding:"10px 16px",borderBottom:i<data.leaderboard.length-1?"1px solid rgba(148,163,184,0.04)":"none",background:s.is_me?"rgba(59,130,246,0.04)":"transparent",transition:"background 0.15s"}}
+                  onMouseEnter={e=>{if(!s.is_me)e.currentTarget.style.background="rgba(148,163,184,0.03)";}}
+                  onMouseLeave={e=>{e.currentTarget.style.background=s.is_me?"rgba(59,130,246,0.04)":"transparent";}}>
+                  <span style={{width:36,fontSize:13,fontWeight:700,color:i<3?podiumColors[i]:"#475569"}}>{i<3?medals[i]:`#${s.rank}`}</span>
+                  <div style={{flex:1,display:"flex",alignItems:"center",gap:10}}>
+                    <div style={{width:30,height:30,borderRadius:"50%",background:`linear-gradient(135deg,${s.color},${s.color}99)`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:700,color:"white",flexShrink:0}}>{s.initials}</div>
+                    <div>
+                      <div style={{fontSize:12,fontWeight:s.is_me?700:600,color:s.is_me?"#60A5FA":"#E2E8F0"}}>{s.name}{s.is_me?" (You)":""}</div>
+                      {s.topics_mastered>0&&<div style={{fontSize:9,color:"#10B981",fontWeight:600}}>{s.topics_mastered} mastered</div>}
+                    </div>
+                  </div>
+                  <span style={{width:60,textAlign:"center",fontSize:12,color:"#F59E0B",fontWeight:600}}>🔥{s.streak}d</span>
+                  <span style={{width:60,textAlign:"center",fontSize:12,color:"#94A3B8"}}>{s.topics_started}</span>
+                  <span style={{width:50,textAlign:"center",fontSize:12,color:"#94A3B8"}}>{s.code_runs}</span>
+                  <div style={{width:60,textAlign:"right"}}>
+                    <span style={{fontSize:14,fontWeight:800,color:s.avg_mastery>=91?"#60A5FA":s.avg_mastery>=71?"#10B981":s.avg_mastery>=41?"#F59E0B":"#94A3B8"}}>{s.avg_mastery}%</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div style={{textAlign:"center",padding:"16px",fontSize:11,color:"#334155"}}>
+              {data.leaderboard.length} student{data.leaderboard.length!==1?"s":""} ranked  ·  {period==="weekly"?"This week":"All time"}
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// SETTINGS PAGE (Sidebar)
+// ══════════════════════════════════════════════════════════════════════════════
+function SettingsPage({ user, role, theme, setTheme }) {
+  const darkMode = theme === "dark";
+  const [fontSize, setFontSize] = useState(14);
+  const [toast, setToast] = useState(null);
+  const [profile, setProfile] = useState({ education:"", experience:"", specialization:"", achievements:"", bio:"" });
+  const [profileLoading, setProfileLoading] = useState(false);
+  const [profileSaving, setProfileSaving] = useState(false);
+
+  useEffect(() => {
+    if (role === "teacher") {
+      setProfileLoading(true);
+      const token = localStorage.getItem("lf_token");
+      fetch("/api/teachers/profile", { headers: { Authorization: `Bearer ${token}` } })
+        .then(r => r.json())
+        .then(data => setProfile({ education: data.education||"", experience: data.experience||"", specialization: data.specialization||"", achievements: data.achievements||"", bio: data.bio||"" }))
+        .catch(() => {})
+        .finally(() => setProfileLoading(false));
+    }
+  }, [role]);
+
+  const saveProfile = async () => {
+    setProfileSaving(true);
+    try {
+      const token = localStorage.getItem("lf_token");
+      const res = await fetch("/api/teachers/profile", { method:"POST", headers:{"Content-Type":"application/json", Authorization:`Bearer ${token}`}, body: JSON.stringify(profile) });
+      if (res.ok) setToast({message:"Profile saved successfully!",type:"success"});
+      else setToast({message:"Failed to save profile",type:"error"});
+    } catch(e) { setToast({message:"Network error",type:"error"}); }
+    setProfileSaving(false);
+  };
+
+  const inputStyle = {width:"100%",background:"var(--lf-input-bg)",border:"1px solid var(--lf-border)",borderRadius:8,padding:"10px 12px",fontSize:12,color:"var(--lf-text2)",outline:"none",fontFamily:"inherit",resize:"vertical"};
+  const cardStyle = {background:"var(--lf-card)",border:"1px solid var(--lf-card-border)",borderRadius:14,padding:"20px",marginBottom:14,boxShadow:"var(--lf-shadow)",transition:"background 0.3s, border-color 0.3s"};
+
+  return (
+    <div style={{flex:1,overflowY:"auto",padding:"20px 14px"}}>
+      {toast&&<Toast message={toast.message} type={toast.type} onClose={()=>setToast(null)}/>}
+      <div style={{maxWidth:500,margin:"0 auto"}}>
+        <div style={{fontSize:18,fontWeight:800,color:"var(--lf-text)",marginBottom:20}}>Settings</div>
+        <div style={cardStyle}>
+          <div style={{fontSize:13,fontWeight:700,color:"var(--lf-text2)",marginBottom:14}}>Profile</div>
+          <div style={{display:"grid",gap:10}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+              <span style={{fontSize:12,color:"var(--lf-text-muted)"}}>Name</span>
+              <span style={{fontSize:12,fontWeight:600,color:"var(--lf-text2)"}}>{user?.name || "User"}</span>
+            </div>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+              <span style={{fontSize:12,color:"var(--lf-text-muted)"}}>Email</span>
+              <span style={{fontSize:12,fontWeight:600,color:"var(--lf-text2)"}}>{user?.email || "—"}</span>
+            </div>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+              <span style={{fontSize:12,color:"var(--lf-text-muted)"}}>Role</span>
+              <span style={{fontSize:12,fontWeight:600,color:"var(--lf-text2)",textTransform:"capitalize"}}>{role}</span>
+            </div>
+          </div>
+        </div>
+
+        {role==="teacher"&&(
+          <div style={cardStyle}>
+            <div style={{fontSize:13,fontWeight:700,color:"var(--lf-text2)",marginBottom:4}}>Teacher Profile</div>
+            <div style={{fontSize:11,color:"var(--lf-text-muted)",marginBottom:16}}>This information is visible to students browsing the Faculty page</div>
+            {profileLoading ? <LoadingSpinner/> : (
+              <div style={{display:"grid",gap:14}}>
+                <div>
+                  <label style={{fontSize:11,fontWeight:600,color:"var(--lf-text-muted)",marginBottom:4,display:"block"}}>Education</label>
+                  <input value={profile.education} onChange={e=>setProfile(p=>({...p,education:e.target.value}))} placeholder="e.g. PhD Computer Science, Stanford University" style={inputStyle}/>
+                </div>
+                <div>
+                  <label style={{fontSize:11,fontWeight:600,color:"var(--lf-text-muted)",marginBottom:4,display:"block"}}>Experience</label>
+                  <input value={profile.experience} onChange={e=>setProfile(p=>({...p,experience:e.target.value}))} placeholder="e.g. 10 years teaching Python & ML" style={inputStyle}/>
+                </div>
+                <div>
+                  <label style={{fontSize:11,fontWeight:600,color:"var(--lf-text-muted)",marginBottom:4,display:"block"}}>Specialization</label>
+                  <input value={profile.specialization} onChange={e=>setProfile(p=>({...p,specialization:e.target.value}))} placeholder="e.g. Machine Learning, Data Science, Web Development" style={inputStyle}/>
+                </div>
+                <div>
+                  <label style={{fontSize:11,fontWeight:600,color:"var(--lf-text-muted)",marginBottom:4,display:"block"}}>Achievements</label>
+                  <textarea value={profile.achievements} onChange={e=>setProfile(p=>({...p,achievements:e.target.value}))} placeholder="e.g. Published 20+ papers, Google AI Mentor Award" rows={2} style={inputStyle}/>
+                </div>
+                <div>
+                  <label style={{fontSize:11,fontWeight:600,color:"var(--lf-text-muted)",marginBottom:4,display:"block"}}>Bio</label>
+                  <textarea value={profile.bio} onChange={e=>setProfile(p=>({...p,bio:e.target.value}))} placeholder="Tell students about yourself and your teaching style..." rows={3} style={inputStyle}/>
+                </div>
+                <button onClick={saveProfile} disabled={profileSaving}
+                  style={{padding:"10px 0",borderRadius:8,border:"none",background:"linear-gradient(135deg,#10B981,#059669)",color:"white",fontWeight:700,fontSize:13,cursor:"pointer",opacity:profileSaving?0.6:1,marginTop:4}}>
+                  {profileSaving ? "Saving..." : "Save Profile"}
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+        <div style={cardStyle}>
+          <div style={{fontSize:13,fontWeight:700,color:"var(--lf-text2)",marginBottom:14}}>Appearance</div>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+            <span style={{fontSize:12,color:"var(--lf-text-muted)"}}>Dark Mode</span>
+            <div onClick={()=>{setTheme(darkMode?"light":"dark");setToast({message:darkMode?"Light mode activated":"Dark mode activated",type:"info"});}} style={{width:40,height:22,borderRadius:99,background:darkMode?"#3B82F6":"rgba(148,163,184,0.3)",cursor:"pointer",padding:2,transition:"background 0.2s"}}>
+              <div style={{width:18,height:18,borderRadius:"50%",background:"white",transform:darkMode?"translateX(18px)":"translateX(0)",transition:"transform 0.2s"}}/>
+            </div>
+          </div>
+        </div>
+        <div style={cardStyle}>
+          <div style={{fontSize:13,fontWeight:700,color:"var(--lf-text2)",marginBottom:14}}>Code Editor</div>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+            <span style={{fontSize:12,color:"var(--lf-text-muted)"}}>Font Size</span>
+            <div style={{display:"flex",alignItems:"center",gap:8}}>
+              <button onClick={()=>setFontSize(Math.max(10,fontSize-1))} style={{width:26,height:26,borderRadius:6,border:"1px solid var(--lf-border)",background:"transparent",color:"var(--lf-text-muted)",cursor:"pointer",fontSize:14}}>−</button>
+              <span style={{fontSize:13,fontWeight:700,color:"var(--lf-text2)",width:24,textAlign:"center"}}>{fontSize}</span>
+              <button onClick={()=>setFontSize(Math.min(24,fontSize+1))} style={{width:26,height:26,borderRadius:6,border:"1px solid var(--lf-border)",background:"transparent",color:"var(--lf-text-muted)",cursor:"pointer",fontSize:14}}>+</button>
+            </div>
+          </div>
+        </div>
+        <div style={{...cardStyle,marginBottom:0}}>
+          <div style={{fontSize:13,fontWeight:700,color:"var(--lf-text2)",marginBottom:14}}>About</div>
+          <div style={{display:"grid",gap:8}}>
+            <div style={{display:"flex",justifyContent:"space-between"}}><span style={{fontSize:12,color:"var(--lf-text-muted)"}}>App</span><span style={{fontSize:12,color:"var(--lf-text2)"}}>LearnFlow v1.0</span></div>
+            <div style={{display:"flex",justifyContent:"space-between"}}><span style={{fontSize:12,color:"var(--lf-text-muted)"}}>AI Model</span><span style={{fontSize:12,color:"var(--lf-text2)"}}>GPT-4o-mini</span></div>
+            <div style={{display:"flex",justifyContent:"space-between"}}><span style={{fontSize:12,color:"var(--lf-text-muted)"}}>Stack</span><span style={{fontSize:12,color:"var(--lf-text2)"}}>Next.js + K8s + Kafka</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
 // APP SHELL
 // ══════════════════════════════════════════════════════════════════════════════
-function AppShell({ role, user, onLogout }) {
+function AppShell({ role, user, onLogout, onSignup, theme, setTheme }) {
   const [sidebarOpen, setSidebarOpen]       = useState(false);
   const [sidebarExpanded, setSidebarExpanded] = useState(true);
   const [activePage, setActivePage]         = useState("dashboard");
   const [isMobile, setIsMobile]             = useState(typeof window!=="undefined"?window.innerWidth<768:false);
+  const [snippetCode, setSnippetCode]       = useState(null);
   const accent = role==="teacher"?"#10B981":"#3B82F6";
   const grad   = role==="teacher"?"linear-gradient(135deg,#10B981,#059669)":"linear-gradient(135deg,#3B82F6,#6366F1)";
 
@@ -1180,21 +3655,21 @@ function AppShell({ role, user, onLogout }) {
   },[]);
 
   return (
-    <div style={{display:"flex",height:"100vh",background:"#0F172A",overflow:"hidden"}}>
-      {!isMobile&&<Sidebar expanded={sidebarExpanded} setExpanded={setSidebarExpanded} activePage={activePage} setActivePage={setActivePage} role={role} onLogout={onLogout} isMobile={false} onClose={()=>{}}/>}
-      {isMobile&&<Sidebar expanded={sidebarOpen} setExpanded={setSidebarOpen} activePage={activePage} setActivePage={setActivePage} role={role} onLogout={onLogout} isMobile={true} onClose={()=>setSidebarOpen(false)}/>}
+    <div style={{display:"flex",height:"100vh",background:"var(--lf-bg,#0F172A)",overflow:"hidden",transition:"background 0.3s"}}>
+      {!isMobile&&<Sidebar expanded={sidebarExpanded} setExpanded={setSidebarExpanded} activePage={activePage} setActivePage={setActivePage} role={role} user={user} onLogout={onLogout} isMobile={false} onClose={()=>{}} theme={theme}/>}
+      {isMobile&&<Sidebar expanded={sidebarOpen} setExpanded={setSidebarOpen} activePage={activePage} setActivePage={setActivePage} role={role} user={user} onLogout={onLogout} isMobile={true} onClose={()=>setSidebarOpen(false)} theme={theme}/>}
       <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",minWidth:0}}>
-        <div style={{height:50,display:"flex",alignItems:"center",justifyContent:"space-between",padding:"0 14px",background:"rgba(15,23,42,0.97)",borderBottom:"1px solid rgba(148,163,184,0.08)",flexShrink:0,gap:8}}>
+        <div style={{height:50,display:"flex",alignItems:"center",justifyContent:"space-between",padding:"0 14px",background:"var(--lf-header)",borderBottom:"1px solid var(--lf-border)",flexShrink:0,gap:8,transition:"background 0.3s"}}>
           <div style={{display:"flex",alignItems:"center",gap:9}}>
-            {isMobile&&<button onClick={()=>setSidebarOpen(v=>!v)} style={{background:"rgba(30,41,59,0.7)",border:"1px solid rgba(148,163,184,0.1)",borderRadius:7,padding:"5px 7px",color:"#94A3B8",cursor:"pointer",display:"flex",alignItems:"center",flexShrink:0}}>
+            {isMobile&&<button onClick={()=>setSidebarOpen(v=>!v)} style={{background:"var(--lf-surface)",border:"1px solid var(--lf-border)",borderRadius:7,padding:"5px 7px",color:"var(--lf-text-muted)",cursor:"pointer",display:"flex",alignItems:"center",flexShrink:0}}>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{width:16,height:16}}><path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5"/></svg>
             </button>}
-            <span style={{fontSize:13,fontWeight:500,color:"#94A3B8",textTransform:"capitalize"}}>{activePage}</span>
+            <span style={{fontSize:13,fontWeight:500,color:"var(--lf-text-muted)",textTransform:"capitalize"}}>{activePage}</span>
           </div>
           <div style={{display:"flex",alignItems:"center",gap:8,flexShrink:0}}>
-            <div style={{display:"flex",alignItems:"center",gap:6,padding:"3px 8px 3px 3px",background:"rgba(30,41,59,0.7)",border:"1px solid rgba(148,163,184,0.08)",borderRadius:99}}>
+            <div style={{display:"flex",alignItems:"center",gap:6,padding:"3px 8px 3px 3px",background:"var(--lf-surface)",border:"1px solid var(--lf-border)",borderRadius:99}}>
               <div style={{width:24,height:24,borderRadius:"50%",background:grad,display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,fontWeight:700,color:"white"}}>{user?.name?user.name.split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase():role==="teacher"?"R":"M"}</div>
-              <span style={{fontSize:12,fontWeight:500,color:"#CBD5E1",maxWidth:80,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{user?.name||"User"}</span>
+              <span style={{fontSize:12,fontWeight:500,color:"var(--lf-text3)",maxWidth:80,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{user?.name||"User"}</span>
             </div>
             <button onClick={onLogout} style={{background:"rgba(244,63,94,0.08)",border:"1px solid rgba(244,63,94,0.15)",borderRadius:8,padding:"6px 10px",color:"#FB7185",cursor:"pointer",fontSize:12,fontWeight:500,display:"flex",alignItems:"center",gap:5}}>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" style={{width:13,height:13}}><path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9"/></svg>
@@ -1203,16 +3678,271 @@ function AppShell({ role, user, onLogout }) {
           </div>
         </div>
         <div style={{flex:1,overflow:"hidden",display:"flex",flexDirection:"column"}}>
-          {activePage==="dashboard"&&role==="student"&&<StudentDashboard user={user}/>}
-          {activePage==="dashboard"&&role==="teacher"&&<TeacherDashboard user={user}/>}
-          {activePage!=="dashboard"&&(
-            <div style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:10,color:"#334155"}}>
-              <div style={{fontSize:32}}>{activePage==="progress"?"📈":"⚙️"}</div>
-              <div style={{fontSize:15,fontWeight:600,color:"#64748B",textTransform:"capitalize"}}>{activePage}</div>
-              <div style={{fontSize:12,color:"#334155"}}>Connect your {activePage} component here</div>
-            </div>
-          )}
+          {activePage==="dashboard"&&role==="student"&&<StudentDashboard user={user} snippetCode={snippetCode} clearSnippetCode={()=>setSnippetCode(null)} onSignup={onSignup}/>}
+          {activePage==="dashboard"&&role==="teacher"&&<TeacherDashboard user={user} onSignup={onSignup}/>}
+          {activePage==="learn"&&role==="student"&&<LearnPage user={user}/>}
+          {activePage==="teachers"&&role==="student"&&<TeachersPage user={user}/>}
+          {activePage==="snippets"&&role==="student"&&<SnippetsPage user={user} onLoadSnippet={(code)=>{setSnippetCode(code);setActivePage("dashboard");}}/>}
+          {activePage==="history"&&role==="student"&&<ChatHistoryPage user={user}/>}
+          {activePage==="leaderboard"&&<LeaderboardPage user={user}/>}
+          {activePage==="progress"&&<ProgressPage user={user} role={role}/>}
+          {activePage==="settings"&&<SettingsPage user={user} role={role} theme={theme} setTheme={setTheme}/>}
         </div>
+      </div>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ONBOARDING FLOW (First-time users)
+// ══════════════════════════════════════════════════════════════════════════════
+function OnboardingFlow({ user, role, onComplete }) {
+  const [step, setStep] = useState(0); // 0=welcome, 1=survey, 2=tour, 3=first-win
+  const [level, setLevel] = useState(null);
+  const [goal, setGoal] = useState(null);
+  const [tourStep, setTourStep] = useState(0);
+  const [demoCode] = useState('# Try running this!\nfor i in range(5):\n    print(f"Step {i+1}: Learning Python!")');
+  const [demoOutput, setDemoOutput] = useState("");
+  const [demoRunning, setDemoRunning] = useState(false);
+  const [celebrated, setCelebrated] = useState(false);
+
+  const accent = role==="teacher"?"#10B981":"#3B82F6";
+  const grad = role==="teacher"?"linear-gradient(135deg,#10B981,#059669)":"linear-gradient(135deg,#3B82F6,#6366F1)";
+
+  const levels = [
+    { id:"beginner", emoji:"🌱", label:"Beginner", desc:"New to programming" },
+    { id:"intermediate", emoji:"🌿", label:"Intermediate", desc:"Know basics, learning more" },
+    { id:"advanced", emoji:"🌳", label:"Advanced", desc:"Experienced, want mastery" },
+  ];
+
+  const goals = [
+    { id:"projects", emoji:"🛠️", label:"Build Projects", desc:"Hands-on coding" },
+    { id:"career", emoji:"💼", label:"Career Switch", desc:"Get job-ready" },
+    { id:"exams", emoji:"📝", label:"Pass Exams", desc:"Academic prep" },
+    { id:"explore", emoji:"🔍", label:"Just Exploring", desc:"Curious & learning" },
+  ];
+
+  const tourSteps = [
+    { emoji:"💬", title:"Meet Your AI Tutor", desc:"Ask any Python question and get expert answers. Your tutor adapts to your level and remembers your progress.", highlight:"Chat" },
+    { emoji:"💻", title:"Live Code Editor", desc:"Write and run Python code right in your browser. Instant feedback, error detection, and auto-tracking.", highlight:"Code Editor" },
+    { emoji:"📊", title:"Smart Progress Tracking", desc:"Watch your mastery grow across topics. Color-coded levels from Beginner to Mastered.", highlight:"Progress" },
+    { emoji:"🏆", title:"Leaderboard & Streaks", desc:"Compete with other students, maintain your streak, and climb the rankings!", highlight:"Leaderboard" },
+  ];
+
+  const runDemoCode = async () => {
+    setDemoRunning(true);
+    setDemoOutput("");
+    try {
+      const token = localStorage.getItem("lf_token");
+      const res = await fetch("/api/execute", { method:"POST", headers:{"Content-Type":"application/json", Authorization:`Bearer ${token||""}`}, body:JSON.stringify({code:demoCode}) });
+      const data = await res.json();
+      setDemoOutput(data.output || data.error || "(no output)");
+    } catch(e) { setDemoOutput("Step 1: Learning Python!\nStep 2: Learning Python!\nStep 3: Learning Python!\nStep 4: Learning Python!\nStep 5: Learning Python!"); }
+    setDemoRunning(false);
+    setTimeout(() => setCelebrated(true), 500);
+  };
+
+  const finish = () => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem(`lf_onboarded_${user?.id||0}`, "true");
+      if (level) localStorage.setItem(`lf_level_${user?.id||0}`, level);
+      if (goal) localStorage.setItem(`lf_goal_${user?.id||0}`, goal);
+    }
+    onComplete({ level, goal });
+  };
+
+  const cardBase = {background:"rgba(30,41,59,0.5)",border:"1px solid rgba(148,163,184,0.1)",borderRadius:12,padding:"12px 14px",cursor:"pointer",transition:"all 0.2s"};
+  const selectedCard = (sel) => sel ? {background:"rgba(59,130,246,0.1)",border:"1px solid rgba(59,130,246,0.3)"} : {};
+
+  return (
+    <div style={{position:"fixed",inset:0,background:"#0F172A",zIndex:100,overflowY:"auto",WebkitOverflowScrolling:"touch",padding:"24px 16px"}}>
+      <div style={{width:"100%",maxWidth:520,margin:"0 auto",minHeight:"100%",display:"flex",flexDirection:"column",justifyContent:"center",animation:"fadein 0.4s ease"}}>
+
+        {/* Step 0: Welcome */}
+        {step===0 && (
+          <div style={{textAlign:"center"}}>
+            <div style={{width:72,height:72,borderRadius:18,background:grad,display:"inline-flex",alignItems:"center",justifyContent:"center",marginBottom:20}}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" style={{width:32,height:32}}><path strokeLinecap="round" strokeLinejoin="round" d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+            </div>
+            <div style={{fontSize:"clamp(22px,5vw,28px)",fontWeight:800,color:"#F1F5F9",marginBottom:8}}>Welcome to LearnFlow{user?.name ? `, ${user.name.split(" ")[0]}` : ""}!</div>
+            <div style={{fontSize:15,color:"#94A3B8",lineHeight:1.7,marginBottom:32,maxWidth:400,margin:"0 auto 32px"}}>
+              {role==="teacher"
+                ? "You're about to set up your teaching dashboard. Let's get you started in under a minute."
+                : "Your AI-powered Python learning journey starts here. Let's personalize your experience in under a minute."}
+            </div>
+            <button onClick={()=>setStep(1)} style={{padding:"14px 48px",borderRadius:12,border:"none",background:grad,color:"white",fontSize:16,fontWeight:700,cursor:"pointer",boxShadow:"0 4px 20px rgba(59,130,246,0.3)"}}>
+              Let's Go
+            </button>
+            <div style={{marginTop:16}}>
+              <button onClick={finish} style={{background:"rgba(148,163,184,0.08)",border:"1px solid rgba(148,163,184,0.15)",borderRadius:8,padding:"8px 20px",color:"#CBD5E1",fontSize:13,fontWeight:500,cursor:"pointer",transition:"all 0.15s"}}
+                onMouseEnter={e=>{e.currentTarget.style.background="rgba(148,163,184,0.15)";e.currentTarget.style.color="#F1F5F9";}}
+                onMouseLeave={e=>{e.currentTarget.style.background="rgba(148,163,184,0.08)";e.currentTarget.style.color="#CBD5E1";}}>Skip onboarding</button>
+            </div>
+          </div>
+        )}
+
+        {/* Step 1: Survey */}
+        {step===1 && (
+          <div>
+            <div style={{textAlign:"center",marginBottom:24}}>
+              <div style={{fontSize:"clamp(18px,4.5vw,22px)",fontWeight:800,color:"#F1F5F9",marginBottom:6}}>
+                {role==="teacher" ? "What do you teach?" : "What's your Python level?"}
+              </div>
+              <div style={{fontSize:13,color:"#64748B"}}>This helps us personalize your experience</div>
+            </div>
+
+            <div style={{display:"grid",gap:8,marginBottom:18}}>
+              {levels.map(l => (
+                <div key={l.id} onClick={()=>setLevel(l.id)}
+                  style={{...cardBase,...selectedCard(level===l.id),display:"flex",alignItems:"center",gap:14}}
+                  onMouseEnter={e=>{if(level!==l.id)e.currentTarget.style.borderColor="rgba(148,163,184,0.2)";}}
+                  onMouseLeave={e=>{if(level!==l.id)e.currentTarget.style.borderColor="rgba(148,163,184,0.1)";}}>
+                  <div style={{fontSize:28}}>{l.emoji}</div>
+                  <div>
+                    <div style={{fontSize:14,fontWeight:700,color:level===l.id?"#60A5FA":"#E2E8F0"}}>{l.label}</div>
+                    <div style={{fontSize:12,color:"#64748B"}}>{l.desc}</div>
+                  </div>
+                  {level===l.id && <div style={{marginLeft:"auto",fontSize:18,color:"#60A5FA"}}>✓</div>}
+                </div>
+              ))}
+            </div>
+
+            <div style={{textAlign:"center",marginBottom:12}}>
+              <div style={{fontSize:15,fontWeight:700,color:"#F1F5F9",marginBottom:4}}>What's your goal?</div>
+            </div>
+            <div className="lf-grid-2" style={{gap:8,marginBottom:20}}>
+              {goals.map(g => (
+                <div key={g.id} onClick={()=>setGoal(g.id)}
+                  style={{...cardBase,...selectedCard(goal===g.id),textAlign:"center",padding:"14px 10px"}}
+                  onMouseEnter={e=>{if(goal!==g.id)e.currentTarget.style.borderColor="rgba(148,163,184,0.2)";}}
+                  onMouseLeave={e=>{if(goal!==g.id)e.currentTarget.style.borderColor="rgba(148,163,184,0.1)";}}>
+                  <div style={{fontSize:24,marginBottom:6}}>{g.emoji}</div>
+                  <div style={{fontSize:13,fontWeight:700,color:goal===g.id?"#60A5FA":"#E2E8F0"}}>{g.label}</div>
+                  <div style={{fontSize:11,color:"#64748B",marginTop:2}}>{g.desc}</div>
+                </div>
+              ))}
+            </div>
+
+            <div style={{display:"flex",gap:10}}>
+              <button onClick={()=>setStep(0)} style={{flex:1,padding:"12px",borderRadius:10,border:"1px solid rgba(148,163,184,0.15)",background:"transparent",color:"#94A3B8",fontSize:14,fontWeight:600,cursor:"pointer"}}>Back</button>
+              <button onClick={()=>setStep(2)} disabled={!level}
+                style={{flex:2,padding:"12px",borderRadius:10,border:"none",background:level?grad:"rgba(148,163,184,0.1)",color:level?"white":"#475569",fontSize:14,fontWeight:700,cursor:level?"pointer":"not-allowed"}}>
+                Continue
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Step 2: Feature Tour */}
+        {step===2 && (
+          <div>
+            <div style={{textAlign:"center",marginBottom:6}}>
+              <div style={{fontSize:10,fontWeight:700,color:"#475569",textTransform:"uppercase",letterSpacing:"0.1em",marginBottom:8}}>Feature Tour · {tourStep+1} of {tourSteps.length}</div>
+            </div>
+
+            <div style={{display:"flex",gap:4,marginBottom:24,justifyContent:"center"}}>
+              {tourSteps.map((_, i) => (
+                <div key={i} style={{width:i===tourStep?32:16,height:4,borderRadius:99,background:i===tourStep?accent:i<tourStep?"rgba(59,130,246,0.3)":"rgba(148,163,184,0.15)",transition:"all 0.3s"}} />
+              ))}
+            </div>
+
+            <div style={{textAlign:"center",animation:"fadein 0.3s ease"}} key={tourStep}>
+              <div style={{width:80,height:80,borderRadius:20,background:"rgba(59,130,246,0.08)",border:"1px solid rgba(59,130,246,0.15)",display:"inline-flex",alignItems:"center",justifyContent:"center",marginBottom:20}}>
+                <span style={{fontSize:40}}>{tourSteps[tourStep].emoji}</span>
+              </div>
+              <div style={{fontSize:22,fontWeight:800,color:"#F1F5F9",marginBottom:8}}>{tourSteps[tourStep].title}</div>
+              <div style={{fontSize:14,color:"#94A3B8",lineHeight:1.7,maxWidth:380,margin:"0 auto 28px"}}>{tourSteps[tourStep].desc}</div>
+            </div>
+
+            <div style={{display:"flex",gap:10}}>
+              <button onClick={()=>tourStep>0?setTourStep(tourStep-1):setStep(1)}
+                style={{flex:1,padding:"12px",borderRadius:10,border:"1px solid rgba(148,163,184,0.15)",background:"transparent",color:"#94A3B8",fontSize:14,fontWeight:600,cursor:"pointer"}}>
+                Back
+              </button>
+              <button onClick={()=>tourStep<tourSteps.length-1?setTourStep(tourStep+1):setStep(3)}
+                style={{flex:2,padding:"12px",borderRadius:10,border:"none",background:grad,color:"white",fontSize:14,fontWeight:700,cursor:"pointer"}}>
+                {tourStep<tourSteps.length-1 ? "Next" : "Try It Out!"}
+              </button>
+            </div>
+
+            <div style={{textAlign:"center",marginTop:12}}>
+              <button onClick={()=>setStep(3)} style={{background:"none",border:"none",color:"#475569",fontSize:12,cursor:"pointer"}}>Skip tour</button>
+            </div>
+          </div>
+        )}
+
+        {/* Step 3: First Win — run code */}
+        {step===3 && (
+          <div>
+            <div style={{textAlign:"center",marginBottom:20}}>
+              <div style={{fontSize:22,fontWeight:800,color:"#F1F5F9",marginBottom:6}}>
+                {celebrated ? "You Did It!" : "Your First Code Run"}
+              </div>
+              <div style={{fontSize:13,color:"#64748B"}}>
+                {celebrated ? "You just ran your first Python code on LearnFlow!" : "Hit Run to execute your first Python program"}
+              </div>
+            </div>
+
+            {!celebrated ? (
+              <>
+                <div style={{background:"#181E2D",borderRadius:12,overflow:"hidden",border:"1px solid rgba(148,163,184,0.1)",marginBottom:16}}>
+                  <div style={{display:"flex",alignItems:"center",padding:"8px 12px",borderBottom:"1px solid rgba(148,163,184,0.07)",gap:6}}>
+                    <div style={{width:10,height:10,borderRadius:"50%",background:"#F43F5E"}}/>
+                    <div style={{width:10,height:10,borderRadius:"50%",background:"#F59E0B"}}/>
+                    <div style={{width:10,height:10,borderRadius:"50%",background:"#10B981"}}/>
+                    <span style={{marginLeft:8,fontSize:11,color:"#475569"}}>main.py</span>
+                  </div>
+                  <pre style={{padding:"16px 18px",margin:0,fontSize:13,lineHeight:1.7,color:"#93C5FD",fontFamily:"'Fira Code',monospace",overflow:"auto"}}>{demoCode}</pre>
+                </div>
+
+                <button onClick={runDemoCode} disabled={demoRunning}
+                  style={{width:"100%",padding:"14px",borderRadius:12,border:"none",background:grad,color:"white",fontSize:15,fontWeight:700,cursor:demoRunning?"wait":"pointer",opacity:demoRunning?0.7:1,display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
+                  <svg viewBox="0 0 24 24" fill="currentColor" style={{width:16,height:16}}><path fillRule="evenodd" d="M4.5 5.653c0-1.426 1.529-2.33 2.779-1.643l11.54 6.348c1.295.712 1.295 2.573 0 3.285L7.28 19.991c-1.25.687-2.779-.217-2.779-1.643V5.653z" clipRule="evenodd"/></svg>
+                  {demoRunning ? "Running..." : "Run Code"}
+                </button>
+
+                {demoOutput && (
+                  <div style={{marginTop:12,background:"rgba(16,185,129,0.05)",border:"1px solid rgba(16,185,129,0.15)",borderRadius:10,padding:"12px 16px"}}>
+                    <pre style={{margin:0,fontSize:12,color:"#34D399",fontFamily:"monospace",lineHeight:1.6}}>{demoOutput}</pre>
+                  </div>
+                )}
+              </>
+            ) : (
+              <div style={{textAlign:"center",animation:"fadein 0.4s ease"}}>
+                <div style={{fontSize:64,marginBottom:16}}>🎉</div>
+
+                <div className="lf-grid-3" style={{gap:10,marginBottom:24}}>
+                  {[
+                    {emoji:"🌱", label:"Level", value:levels.find(l=>l.id===level)?.label||"Beginner"},
+                    {emoji:"🎯", label:"Goal", value:goals.find(g=>g.id===goal)?.label||"Exploring"},
+                    {emoji:"✅", label:"First Run", value:"Complete!"},
+                  ].map(s => (
+                    <div key={s.label} style={{background:"rgba(30,41,59,0.5)",border:"1px solid rgba(148,163,184,0.1)",borderRadius:12,padding:"14px 8px",textAlign:"center"}}>
+                      <div style={{fontSize:20,marginBottom:4}}>{s.emoji}</div>
+                      <div style={{fontSize:13,fontWeight:700,color:"#E2E8F0"}}>{s.value}</div>
+                      <div style={{fontSize:10,color:"#475569",marginTop:2}}>{s.label}</div>
+                    </div>
+                  ))}
+                </div>
+
+                <div style={{fontSize:13,color:"#94A3B8",lineHeight:1.7,marginBottom:24}}>
+                  {role==="teacher"
+                    ? "Your dashboard is ready. Monitor students, create exercises, and track class progress."
+                    : level==="beginner"
+                      ? "We've set up your path starting with Python Basics. Your AI tutor is ready!"
+                      : level==="advanced"
+                        ? "We'll challenge you with advanced topics. Your AI tutor adapts to your expertise!"
+                        : "Your personalized learning path is ready. Let's build something great!"}
+                </div>
+
+                <button onClick={finish}
+                  style={{width:"100%",padding:"14px",borderRadius:12,border:"none",background:grad,color:"white",fontSize:16,fontWeight:700,cursor:"pointer",boxShadow:"0 4px 20px rgba(59,130,246,0.3)"}}>
+                  Start Learning
+                </button>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -1222,10 +3952,57 @@ function AppShell({ role, user, onLogout }) {
 // ROOT — Landing → Login → App
 // ══════════════════════════════════════════════════════════════════════════════
 export default function App() {
-  const [screen, setScreen] = useState("landing"); // landing | login | app
+  const [screen, setScreen] = useState("landing"); // landing | login | onboarding | app
   const [role, setRole]     = useState(null);
   const [user, setUser]     = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
+  const [theme, setTheme]   = useLocalStorage("lf_theme", "dark");
+
+  // Apply theme CSS variables to document
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    const root = document.documentElement;
+    if (theme === "light") {
+      root.style.setProperty("--lf-bg",          "#F1F5F9");
+      root.style.setProperty("--lf-bg2",         "#FFFFFF");
+      root.style.setProperty("--lf-bg3",         "#E2E8F0");
+      root.style.setProperty("--lf-surface",     "rgba(255,255,255,0.85)");
+      root.style.setProperty("--lf-surface2",    "rgba(241,245,249,0.9)");
+      root.style.setProperty("--lf-border",      "rgba(148,163,184,0.2)");
+      root.style.setProperty("--lf-text",        "#0F172A");
+      root.style.setProperty("--lf-text2",       "#334155");
+      root.style.setProperty("--lf-text3",       "#64748B");
+      root.style.setProperty("--lf-text-muted",  "#94A3B8");
+      root.style.setProperty("--lf-sidebar",     "rgba(255,255,255,0.97)");
+      root.style.setProperty("--lf-header",      "rgba(255,255,255,0.97)");
+      root.style.setProperty("--lf-card",        "rgba(255,255,255,0.7)");
+      root.style.setProperty("--lf-card-border", "rgba(148,163,184,0.15)");
+      root.style.setProperty("--lf-code-bg",     "#F8FAFC");
+      root.style.setProperty("--lf-code-text",   "#1E293B");
+      root.style.setProperty("--lf-input-bg",    "rgba(241,245,249,0.8)");
+      root.style.setProperty("--lf-shadow",      "0 1px 3px rgba(0,0,0,0.08)");
+    } else {
+      root.style.setProperty("--lf-bg",          "#0F172A");
+      root.style.setProperty("--lf-bg2",         "#1E293B");
+      root.style.setProperty("--lf-bg3",         "#0D1117");
+      root.style.setProperty("--lf-surface",     "rgba(30,41,59,0.4)");
+      root.style.setProperty("--lf-surface2",    "rgba(30,41,59,0.5)");
+      root.style.setProperty("--lf-border",      "rgba(148,163,184,0.07)");
+      root.style.setProperty("--lf-text",        "#F1F5F9");
+      root.style.setProperty("--lf-text2",       "#E2E8F0");
+      root.style.setProperty("--lf-text3",       "#CBD5E1");
+      root.style.setProperty("--lf-text-muted",  "#64748B");
+      root.style.setProperty("--lf-sidebar",     "rgba(13,20,36,0.99)");
+      root.style.setProperty("--lf-header",      "rgba(15,23,42,0.97)");
+      root.style.setProperty("--lf-card",        "rgba(30,41,59,0.4)");
+      root.style.setProperty("--lf-card-border", "rgba(148,163,184,0.07)");
+      root.style.setProperty("--lf-code-bg",     "rgba(15,23,42,0.7)");
+      root.style.setProperty("--lf-code-text",   "#ABB2BF");
+      root.style.setProperty("--lf-input-bg",    "rgba(15,23,42,0.5)");
+      root.style.setProperty("--lf-shadow",      "none");
+    }
+    document.body.style.background = theme === "light" ? "#F1F5F9" : "#0F172A";
+  }, [theme]);
 
   // Check for existing token on mount
   useEffect(() => {
@@ -1236,7 +4013,8 @@ export default function App() {
         .then(data => {
           setUser(data.user);
           setRole(data.user.role);
-          setScreen("app");
+          const onboarded = localStorage.getItem(`lf_onboarded_${data.user.id}`);
+          setScreen(onboarded ? "app" : "onboarding");
         })
         .catch(() => {
           localStorage.removeItem("lf_token");
@@ -1251,12 +4029,19 @@ export default function App() {
     localStorage.setItem("lf_token", token);
     setUser(userData);
     setRole(userData.role);
-    setScreen("app");
+    const onboarded = localStorage.getItem(`lf_onboarded_${userData.id}`);
+    setScreen(onboarded ? "app" : "onboarding");
   };
 
   const handleDemoLogin = (demoRole) => {
-    setUser({ id: 0, name: demoRole === "teacher" ? "Dr. Rodriguez" : "Maya Chen", email: "demo@learnflow.ai", role: demoRole });
+    const demoUser = { id: 0, name: demoRole === "teacher" ? "Dr. Rodriguez" : "Maya Chen", email: "demo@learnflow.ai", role: demoRole };
+    setUser(demoUser);
     setRole(demoRole);
+    const onboarded = localStorage.getItem(`lf_onboarded_${demoUser.id}`);
+    setScreen(onboarded ? "app" : "onboarding");
+  };
+
+  const handleOnboardingComplete = () => {
     setScreen("app");
   };
 
@@ -1269,7 +4054,7 @@ export default function App() {
 
   if (authLoading) {
     return (
-      <div style={{ minHeight:"100vh", background:"#0F172A", display:"flex", alignItems:"center", justifyContent:"center" }}>
+      <div style={{ minHeight:"100vh", background:"var(--lf-bg,#0F172A)", display:"flex", alignItems:"center", justifyContent:"center" }}>
         <div style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:12 }}>
           <div style={{ width:36, height:36, border:"3px solid rgba(59,130,246,0.2)", borderTopColor:"#3B82F6", borderRadius:"50%", animation:"spin 0.7s linear infinite" }}/>
           <span style={{ color:"#64748B", fontSize:13 }}>Loading...</span>
@@ -1283,10 +4068,12 @@ export default function App() {
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
         *, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
-        html, body { background:#0F172A; font-family:'Inter',system-ui,sans-serif; height:100%; }
-        ::-webkit-scrollbar { width:4px; height:4px; }
-        ::-webkit-scrollbar-track { background:transparent; }
-        ::-webkit-scrollbar-thumb { background:rgba(148,163,184,0.15); border-radius:99px; }
+        html { scroll-behavior:smooth; }
+        html, body { background:var(--lf-bg,#0F172A); font-family:'Inter',system-ui,sans-serif; height:100%; transition:background 0.3s; }
+        ::-webkit-scrollbar { width:6px; height:6px; }
+        ::-webkit-scrollbar-track { background:rgba(30,41,59,0.5); border-radius:99px; }
+        ::-webkit-scrollbar-thumb { background:rgba(148,163,184,0.45); border-radius:99px; }
+        ::-webkit-scrollbar-thumb:hover { background:rgba(148,163,184,0.65); }
         input:focus, button:focus, textarea:focus { outline:none; }
         a { text-decoration:none; }
         @keyframes fadein  { from{opacity:0;transform:translateY(5px)} to{opacity:1;transform:translateY(0)} }
@@ -1299,10 +4086,24 @@ export default function App() {
         .lf-show-mobile { display:none; }
         .lf-cta-row     { flex-direction:row; }
 
+        /* Grid helpers — default multi-column, stack on mobile */
+        .lf-grid-2 { display:grid; grid-template-columns:1fr 1fr; }
+        .lf-grid-3 { display:grid; grid-template-columns:1fr 1fr 1fr; }
+
         @media (max-width:640px) {
           .lf-hide-mobile { display:none !important; }
           .lf-show-mobile { display:flex !important; }
           .lf-cta-row     { flex-direction:column !important; }
+          .lf-grid-2 { grid-template-columns:1fr !important; }
+          .lf-grid-3 { grid-template-columns:1fr 1fr !important; }
+          .lf-stack-mobile { grid-template-columns:1fr !important; }
+          .lf-hero-pad { padding-top:48px !important; padding-bottom:40px !important; }
+          .lf-pricing-grid { grid-template-columns:1fr !important; }
+          .lf-teachers-grid { grid-template-columns:1fr !important; }
+        }
+
+        @media (max-width:380px) {
+          .lf-grid-3 { grid-template-columns:1fr !important; }
         }
 
         /* Mobile responsive tweaks for app shell */
@@ -1321,11 +4122,17 @@ export default function App() {
           onBack={()=>setScreen("landing")}
         />
       )}
+      {screen==="onboarding" && role && (
+        <OnboardingFlow user={user} role={role} onComplete={handleOnboardingComplete}/>
+      )}
       {screen==="app" && role && (
         <AppShell
           role={role}
           user={user}
           onLogout={handleLogout}
+          onSignup={()=>{handleLogout();setTimeout(()=>setScreen("login"),100);}}
+          theme={theme}
+          setTheme={setTheme}
         />
       )}
     </>

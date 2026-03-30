@@ -43,6 +43,10 @@ export async function GET(req: NextRequest) {
       name: r.topic,
       pct: Math.round(Number(r.pct)),
       level: r.level || calcLevel(Number(r.pct)),
+      exercises_completed: Math.round(Number(r.exercises_completed || 0)),
+      quiz_score: Math.round(Number(r.quiz_score || 0)),
+      code_quality: Math.round(Number(r.code_quality || 0)),
+      streak: Number(r.streak || 0),
     }))
   });
 }

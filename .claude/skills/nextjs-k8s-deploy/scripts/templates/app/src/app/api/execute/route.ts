@@ -67,19 +67,38 @@ export async function POST(req: NextRequest) {
             });
           }
         } else {
-          // Successful run: update code_quality + exercises_completed + recalculate mastery
+          // Successful run: update code_quality + exercises_completed + streak + recalculate mastery
           if (prog.rows.length > 0) {
             const p = prog.rows[0];
             const newCQ = Math.min(100, Number(p.code_quality || 0) + 5);
             const newEC = Math.min(100, Number(p.exercises_completed || 0) + 2);
             const qs = Number(p.quiz_score || 0);
-            const st = Math.min(Number(p.streak || 0) * 10, 100);
+
+            // Calculate actual day streak from submissions
+            const streakQ = await pool.query(
+              `SELECT DISTINCT DATE(submitted_at) as d FROM submissions
+               WHERE user_id = $1 ORDER BY d DESC`,
+              [user.user_id]
+            );
+            let dayStreak = 0;
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            for (let i = 0; i < streakQ.rows.length; i++) {
+              const expected = new Date(today);
+              expected.setDate(expected.getDate() - i);
+              const actual = new Date(streakQ.rows[i].d);
+              actual.setHours(0, 0, 0, 0);
+              if (actual.getTime() === expected.getTime()) dayStreak++;
+              else break;
+            }
+
+            const st = Math.min(dayStreak * 10, 100);
             const score = Math.round(newEC * 0.4 + qs * 0.3 + newCQ * 0.2 + st * 0.1);
             const level = score >= 91 ? "Mastered" : score >= 71 ? "Proficient" : score >= 41 ? "Learning" : "Beginner";
             await pool.query(
-              `UPDATE progress SET code_quality = $2, exercises_completed = $3, mastery_score = $4, level = $5, updated_at = NOW()
+              `UPDATE progress SET code_quality = $2, exercises_completed = $3, mastery_score = $4, level = $5, streak = $6, updated_at = NOW()
                WHERE id = $1`,
-              [p.id, newCQ, newEC, score, level]
+              [p.id, newCQ, newEC, score, level, dayStreak]
             );
           }
         }

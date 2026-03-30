@@ -28,6 +28,7 @@ LearnFlow is an AI-powered Python tutoring platform built entirely using AI Skil
 | F | Struggle Detection (Live) | [x] COMPLETE | 2026-03-27 |
 | G | Quizzes & Exercises | [x] COMPLETE | 2026-03-27 |
 | H | Polish & Edge Cases | [x] COMPLETE | 2026-03-27 |
+| I | Enhanced UX Features (10-16) | [x] COMPLETE | 2026-03-30 |
 | 9 | Cloud Deployment (GKE) | [x] COMPLETE | 2026-03-27 |
 | 10 | Continuous Deployment (Argo CD + GitHub Actions) | [x] COMPLETE | 2026-03-27 |
 
@@ -212,7 +213,8 @@ hack3/
 │   ├── phase-8-polish-demo.md
 │   ├── phase-f-struggle-detection.md
 │   ├── phase-g-quizzes-exercises.md
-│   └── phase-h-polish-edge-cases.md
+│   ├── phase-h-polish-edge-cases.md
+│   └── phase-i-enhanced-ux-features.md
 ├── .specify/                          # SpecifyPlus framework internals
 │   ├── memory/constitution.md         # Project constitution (6 principles)
 │   ├── templates/
@@ -398,6 +400,22 @@ Requirement → Spec → Plan → Task → Skill → AI Execution
   - Auth token already persisted via `lf_token` (Phase A)
 - **Frontend rebuilt and redeployed** to K8s with all Phase A-H changes
 
+### Phase I: Enhanced UX Features (COMPLETE)
+7 features implemented to elevate the student/teacher experience:
+
+- **Feature 10 — Streak Tracking Fix**: `/api/execute` now calculates consecutive-day streak from `submissions` table and syncs to `progress.streak` column. Streak properly feeds into mastery formula (10% weight).
+- **Feature 11 — Leaderboard**: `/api/leaderboard` route with `?period=all|weekly` filter. Aggregates avg mastery, max streak, topics, code runs, quizzes across users. `LeaderboardPage` component with podium display, rank badges, and `is_me` highlighting.
+- **Feature 12 — Dark/Light Mode**: CSS custom properties (`--lf-bg`, `--lf-card`, `--lf-text`, etc. — 18 variables). Theme toggle in `SettingsPage`, persisted via `lf_theme` in localStorage. Applied globally via `useEffect` on `document.documentElement.style`.
+- **Feature 13 — Onboarding Flow**: 4-step flow (Welcome → Survey → Feature Tour → First Code Run). Per-user tracking (`lf_onboarded_${userId}`). Skip button with visible styling. Only shows once per user account.
+- **Feature 14 — Chat History Page**: `ChatHistoryPage` component with search, date grouping, conversation preview cards. Click to expand full conversation with message bubbles (user/AI styled differently).
+- **Feature 15 — Code Snippets**: `/api/snippets` route (GET/POST/DELETE/PATCH). `SnippetsPage` with 8 pre-built starter templates + user-saved snippets. Star/favorite toggle, tag filtering, search. "Load into Editor" button passes code to StudentDashboard via lifted state.
+- **Feature 16 — Voice Input**: Web Speech API (`SpeechRecognition`/`webkitSpeechRecognition`) mic button in chat. Real-time transcript appended to chat input. Visual feedback (pulsing red dot) during recording. Graceful fallback for unsupported browsers.
+- **Bug Fix — Dynamic Sidebar**: Replaced hardcoded "Mr. Rodriguez"/"Maya Chen" with dynamic `user.name` and computed initials from `user` prop.
+
+**Files modified:** `page.jsx` (all components), `api/execute/route.ts` (streak), `api/leaderboard/route.ts` (new), `api/snippets/route.ts` (new), `api/teacher/student-detail/route.ts` (TS fix)
+**Database tables:** `snippets` (new, auto-created)
+**New nav items:** Snippets, Chat History, Leaderboard (added to `NAV_ITEMS` array)
+
 ### Phase 9: Cloud Deployment — GKE (COMPLETE)
 - **Cloud provider**: Google Cloud Platform (GKE)
 - **Cluster**: Reused existing `todo-cluster` (2x `e2-standard-2`, us-central1-a) — shared with todo app via namespace isolation
@@ -441,9 +459,9 @@ Requirement → Spec → Plan → Task → Skill → AI Execution
 | nextjs-k8s-deploy | DONE | 5 | Deploy Next.js + Monaco frontend (Student/Teacher dashboards, code sandbox) |
 | docusaurus-deploy | DONE | 6 | Deploy Docusaurus docs on K8s (10 pages, nginx) |
 
-## Production Enhancement Phases (A-H)
+## Production Enhancement Phases (A-I)
 
-After the initial 8 infrastructure/build phases, 8 additional production-readiness phases were completed to transform LearnFlow from a demo into a fully functional AI tutoring platform:
+After the initial 8 infrastructure/build phases, 9 additional production-readiness phases were completed to transform LearnFlow from a demo into a fully functional AI tutoring platform:
 
 | Phase | Focus | Key Deliverables |
 |-------|-------|-----------------|
@@ -455,9 +473,10 @@ After the initial 8 infrastructure/build phases, 8 additional production-readine
 | F | Struggle Detection | 4 trigger types, KafkaJS events, teacher alerts (10s polling), exercise assignment |
 | G | Quizzes & Exercises | AI quiz generation, 3-tier auto-grading, exercise assignment flow, mastery updates |
 | H | Polish | Toast notifications, loading spinners, empty states, mobile CSS, localStorage persistence |
+| I | Enhanced UX | Streak fix, leaderboard, dark mode, onboarding, chat history, code snippets, voice input |
 
-**API Routes Created (Phases A-H):** 17 routes total
-**Database Tables Added:** `quizzes`, `quiz_attempts`, `assigned_exercises` (extended), `struggle_alerts` (extended)
+**API Routes Created (Phases A-I):** 19 routes total (+`/api/leaderboard`, `/api/snippets`)
+**Database Tables Added:** `quizzes`, `quiz_attempts`, `assigned_exercises` (extended), `struggle_alerts` (extended), `snippets`
 **Libraries Added:** `kafkajs`, `jsonwebtoken`, `bcryptjs`, `openai`
 
 ## MCP Code Execution Pattern

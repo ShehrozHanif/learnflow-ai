@@ -12,7 +12,7 @@ export async function POST(req: NextRequest) {
   const { topic, difficulty, num_questions } = await req.json();
   if (!topic) return NextResponse.json({ error: "Topic required" }, { status: 400 });
 
-  const count = Math.min(num_questions || 5, 10);
+  const count = Math.min(num_questions || 5, 15);
   const diff = difficulty || "beginner";
 
   if (!OPENAI_API_KEY || OPENAI_API_KEY === "mock") {
