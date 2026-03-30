@@ -30,19 +30,22 @@ async function migrate() {
   `);
   console.log("  + teacher_profiles table created");
 
-  // 2. enrollments — student picks a teacher
+  // 2. enrollments — student picks a teacher (with 7-day graceful removal)
   await pool.query(`
     CREATE TABLE IF NOT EXISTS enrollments (
       id SERIAL PRIMARY KEY,
       student_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
       teacher_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
       enrolled_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      removal_requested_at TIMESTAMPTZ DEFAULT NULL,
       UNIQUE(student_id, teacher_id)
     );
     CREATE INDEX IF NOT EXISTS idx_enrollments_student ON enrollments(student_id);
     CREATE INDEX IF NOT EXISTS idx_enrollments_teacher ON enrollments(teacher_id);
   `);
-  console.log("  + enrollments table created");
+  // Add removal_requested_at column if table already exists without it
+  await pool.query(`ALTER TABLE enrollments ADD COLUMN IF NOT EXISTS removal_requested_at TIMESTAMPTZ DEFAULT NULL`).catch(() => {});
+  console.log("  + enrollments table created (with removal_requested_at)");
 
   // 3. Auto-create teacher_profiles for existing teachers
   await pool.query(`

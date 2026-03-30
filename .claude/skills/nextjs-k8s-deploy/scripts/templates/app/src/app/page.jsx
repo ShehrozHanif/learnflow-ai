@@ -408,7 +408,7 @@ function LandingPage({ onNavigate }) {
       )}
 
       {/* ── HERO ── */}
-      <section style={{ position:"relative", zIndex:10, display:"flex", flexDirection:"column", alignItems:"center", textAlign:"center", padding:"80px 20px 64px" }}>
+      <section className="lf-hero-pad" style={{ position:"relative", zIndex:10, display:"flex", flexDirection:"column", alignItems:"center", textAlign:"center", padding:"80px 20px 64px" }}>
         {/* eyebrow */}
         <div style={{ display:"inline-flex", alignItems:"center", gap:8, fontSize:11, fontWeight:600, letterSpacing:"0.12em", textTransform:"uppercase", marginBottom:28, padding:"6px 16px", borderRadius:99, background:"rgba(59,130,246,0.1)", border:"1px solid rgba(59,130,246,0.2)", color:"#93C5FD" }}>
           <span style={{ width:6, height:6, borderRadius:"50%", background:"#60A5FA", display:"inline-block", animation:"pulse2 2s ease-in-out infinite" }}/>
@@ -528,7 +528,7 @@ function LandingPage({ onNavigate }) {
           <h2 style={{ fontSize:"clamp(1.6rem,4vw,2.4rem)", fontWeight:800, color:"white", letterSpacing:"-0.02em" }}>Empower your classroom with AI</h2>
           <p style={{ fontSize:14, color:"#64748B", marginTop:12, maxWidth:520, margin:"12px auto 0" }}>Real-time insights into every student's progress. Detect struggles before they escalate.</p>
         </div>
-        <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(240px,1fr))", gap:14 }}>
+        <div className="lf-teachers-grid" style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(240px,1fr))", gap:14 }}>
           {[
             { icon:"🔔", title:"Struggle Detection", desc:"Get instant alerts when students hit repeated errors, show frustration, or score low on quizzes.", accent:"#F59E0B" },
             { icon:"📊", title:"Progress Dashboard", desc:"Track mastery levels across all topics for every student. See who's ahead and who needs help.", accent:"#3B82F6" },
@@ -559,7 +559,7 @@ function LandingPage({ onNavigate }) {
           <p style={{ fontSize:10, fontWeight:700, letterSpacing:"0.12em", textTransform:"uppercase", color:"#475569", marginBottom:10 }}>Pricing</p>
           <h2 style={{ fontSize:"clamp(1.6rem,4vw,2.4rem)", fontWeight:800, color:"white", letterSpacing:"-0.02em" }}>Start free. Upgrade when ready.</h2>
         </div>
-        <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(260px,1fr))", gap:16, alignItems:"start" }}>
+        <div className="lf-pricing-grid" style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(260px,1fr))", gap:16, alignItems:"start" }}>
           {/* Free tier */}
           <div style={{ background:"rgba(15,23,42,0.6)", border:"1px solid rgba(148,163,184,0.1)", borderRadius:16, padding:"28px 24px", backdropFilter:"blur(12px)" }}>
             <p style={{ fontSize:12, fontWeight:700, textTransform:"uppercase", letterSpacing:"0.08em", color:"#64748B", marginBottom:6 }}>Free</p>
@@ -654,7 +654,7 @@ function LandingPage({ onNavigate }) {
             </div>
 
             {/* Stats row */}
-            <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:6,marginBottom:16}}>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(70px,1fr))",gap:6,marginBottom:16}}>
               {[{v:activeModule.lessons,l:"Lessons",c:"#3B82F6"},{v:activeModule.quizzes,l:"Quizzes",c:"#8B5CF6"},{v:activeModule.exercises,l:"Exercises",c:"#10B981"},{v:activeModule.time,l:"Est. Time",c:"#F59E0B"}].map(s=>(
                 <div key={s.l} style={{background:"rgba(30,41,59,0.5)",borderRadius:8,padding:"10px 8px",textAlign:"center"}}>
                   <div style={{fontSize:16,fontWeight:800,color:s.c}}>{s.v}</div>
@@ -1810,7 +1810,7 @@ function TeacherDashboard({ user, onSignup }) {
                 <span style={{fontSize:12,fontWeight:600,color:"#E2E8F0"}}>{a.topic}</span>
                 <span style={{fontSize:10,fontWeight:700,padding:"2px 7px",borderRadius:99,background:"rgba(244,63,94,0.1)",color:"#FB7185",border:"1px solid rgba(244,63,94,0.2)",marginLeft:"auto"}}>{a.attempts} attempts</span>
               </div>
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:6}}>
+              <div className="lf-grid-3" style={{gap:6}}>
                 <button style={{padding:"7px 4px",borderRadius:7,border:"1px solid #3B82F630",background:"#3B82F612",color:"#3B82F6",fontSize:11,fontWeight:600,cursor:"pointer",textAlign:"center"}}>View Code</button>
                 <button onClick={()=>resolveAlert(a.id)} style={{padding:"7px 4px",borderRadius:7,border:"1px solid #10B98130",background:"#10B98112",color:"#10B981",fontSize:11,fontWeight:600,cursor:"pointer",textAlign:"center"}}>Resolve</button>
                 <button onClick={()=>setAssignModal({title:`Help: ${a.topic}`,description:`Practice exercise for ${a.topic} — assigned because you need extra practice.`,starter_code:`# Practice: ${a.topic}\n# Write your solution here\n`,difficulty:"beginner",topic:a.topic})} style={{padding:"7px 4px",borderRadius:7,border:"1px solid #8B5CF630",background:"#8B5CF612",color:"#8B5CF6",fontSize:11,fontWeight:600,cursor:"pointer",textAlign:"center"}}>Assign</button>
@@ -1990,7 +1990,7 @@ function TeacherProgressPage({ user }) {
         </div>
 
         {/* Top Performers & Struggling — side by side */}
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:20}}>
+        <div className="lf-grid-2" style={{gap:12,marginBottom:20}}>
           <div>
             <div style={{fontSize:14,fontWeight:700,color:"#F1F5F9",marginBottom:8}}>Top Performers</div>
             <div style={{background:"rgba(30,41,59,0.4)",border:"1px solid rgba(148,163,184,0.07)",borderRadius:10,padding:"10px"}}>
@@ -2166,16 +2166,49 @@ function TeachersPage({ user }) {
   const authHeaders = token ? { Authorization: `Bearer ${token}` } : {};
   const [teachers, setTeachers] = useState([]);
   const [myMentorId, setMyMentorId] = useState(null);
+  const [removalRequestedAt, setRemovalRequestedAt] = useState(null);
   const [loading, setLoading] = useState(true);
   const [selectedTeacher, setSelectedTeacher] = useState(null);
   const [enrolling, setEnrolling] = useState(false);
+  const [removeModal, setRemoveModal] = useState(false);
+  const [removing, setRemoving] = useState(false);
   const [toast, setToast] = useState(null);
 
-  useEffect(() => {
+  const loadTeachers = () => {
     fetch("/api/teachers/list", { headers: authHeaders })
-      .then(r => r.json()).then(d => { if (d.teachers) { setTeachers(d.teachers); setMyMentorId(d.my_mentor_id); } })
+      .then(r => r.json()).then(d => { if (d.teachers) { setTeachers(d.teachers); setMyMentorId(d.my_mentor_id); setRemovalRequestedAt(d.removal_requested_at || null); } })
       .catch(() => {}).finally(() => setLoading(false));
-  }, []);
+  };
+  useEffect(loadTeachers, []);
+
+  const daysLeft = removalRequestedAt ? Math.max(0, 7 - Math.floor((Date.now() - new Date(removalRequestedAt).getTime()) / 86400000)) : null;
+
+  const requestRemoval = async () => {
+    setRemoving(true);
+    try {
+      const res = await fetch("/api/teachers/unenroll", { method: "POST", headers: { ...authHeaders, "Content-Type": "application/json" }, body: JSON.stringify({ action: "request" }) });
+      if (res.ok) {
+        setRemovalRequestedAt(new Date().toISOString());
+        setRemoveModal(false);
+        setToast({ message: "Removal requested. Your enrollment will end in 7 days.", type: "info" });
+        setTimeout(() => setToast(null), 4000);
+      }
+    } catch(e) { setToast({ message: "Failed to request removal", type: "error" }); setTimeout(() => setToast(null), 3000); }
+    setRemoving(false);
+  };
+
+  const cancelRemoval = async () => {
+    setRemoving(true);
+    try {
+      const res = await fetch("/api/teachers/unenroll", { method: "POST", headers: { ...authHeaders, "Content-Type": "application/json" }, body: JSON.stringify({ action: "cancel" }) });
+      if (res.ok) {
+        setRemovalRequestedAt(null);
+        setToast({ message: "Removal cancelled. You are still enrolled!", type: "success" });
+        setTimeout(() => setToast(null), 3000);
+      }
+    } catch(e) { setToast({ message: "Failed to cancel removal", type: "error" }); setTimeout(() => setToast(null), 3000); }
+    setRemoving(false);
+  };
 
   const enroll = async (teacherId) => {
     setEnrolling(true);
@@ -2186,6 +2219,7 @@ function TeachersPage({ user }) {
       });
       if (res.ok) {
         setMyMentorId(teacherId);
+        setRemovalRequestedAt(null);
         setTeachers(prev => prev.map(t => ({ ...t, is_my_mentor: t.id === teacherId, student_count: t.id === teacherId ? t.student_count + 1 : (t.is_my_mentor ? t.student_count - 1 : t.student_count) })));
         setSelectedTeacher(null);
         setToast({ message: "Mentor selected successfully!", type: "success" });
@@ -2211,13 +2245,23 @@ function TeachersPage({ user }) {
           const mentor = teachers.find(t => t.id === myMentorId);
           if (!mentor) return null;
           return (
-            <div style={{background:"rgba(16,185,129,0.06)",border:"1px solid rgba(16,185,129,0.2)",borderRadius:12,padding:"14px 16px",marginBottom:16,display:"flex",alignItems:"center",gap:12}}>
-              <div style={{width:36,height:36,borderRadius:"50%",background:"linear-gradient(135deg,#10B981,#059669)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,fontWeight:700,color:"white",flexShrink:0}}>{mentor.initials}</div>
-              <div style={{flex:1}}>
-                <div style={{fontSize:13,fontWeight:600,color:"#E2E8F0"}}>{mentor.name}</div>
-                <div style={{fontSize:11,color:"#34D399"}}>Your current mentor</div>
+            <div style={{marginBottom:16}}>
+              <div style={{background: removalRequestedAt ? "rgba(245,158,11,0.06)" : "rgba(16,185,129,0.06)", border:`1px solid ${removalRequestedAt ? "rgba(245,158,11,0.2)" : "rgba(16,185,129,0.2)"}`,borderRadius:12,padding:"14px 16px",display:"flex",alignItems:"center",gap:12}}>
+                <div style={{width:36,height:36,borderRadius:"50%",background:`linear-gradient(135deg,${removalRequestedAt ? "#F59E0B,#D97706" : "#10B981,#059669"})`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,fontWeight:700,color:"white",flexShrink:0}}>{mentor.initials}</div>
+                <div style={{flex:1}}>
+                  <div style={{fontSize:13,fontWeight:600,color:"#E2E8F0"}}>{mentor.name}</div>
+                  <div style={{fontSize:11,color:removalRequestedAt ? "#FBBF24" : "#34D399"}}>{removalRequestedAt ? `Removal in ${daysLeft} day${daysLeft !== 1 ? "s" : ""}` : "Your current mentor"}</div>
+                </div>
+                {removalRequestedAt ? (
+                  <button onClick={cancelRemoval} disabled={removing} style={{fontSize:10,fontWeight:700,padding:"5px 12px",borderRadius:99,border:"1px solid rgba(16,185,129,0.3)",background:"rgba(16,185,129,0.1)",color:"#34D399",cursor:"pointer",opacity:removing?0.6:1}}>
+                    {removing ? "..." : "Cancel Removal"}
+                  </button>
+                ) : (
+                  <button onClick={() => setRemoveModal(true)} style={{fontSize:10,fontWeight:700,padding:"5px 12px",borderRadius:99,border:"1px solid rgba(239,68,68,0.2)",background:"rgba(239,68,68,0.06)",color:"#F87171",cursor:"pointer"}}>
+                    Remove
+                  </button>
+                )}
               </div>
-              <span style={{fontSize:9,fontWeight:700,padding:"3px 8px",borderRadius:99,background:"rgba(16,185,129,0.12)",color:"#34D399"}}>Enrolled</span>
             </div>
           );
         })()}
@@ -2308,6 +2352,33 @@ function TeachersPage({ user }) {
           </div>
         </div>
       )}
+
+      {/* Remove Mentor Confirmation Modal */}
+      {removeModal && (() => {
+        const mentor = teachers.find(t => t.id === myMentorId);
+        return (
+          <div onClick={() => setRemoveModal(false)} style={{position:"fixed",inset:0,zIndex:110,background:"rgba(0,0,0,0.7)",backdropFilter:"blur(8px)",display:"flex",alignItems:"center",justifyContent:"center",padding:16,animation:"fadein 0.2s ease"}}>
+            <div onClick={e=>e.stopPropagation()} style={{background:"#0F172A",border:"1px solid rgba(239,68,68,0.2)",borderRadius:18,padding:"28px 24px",maxWidth:420,width:"100%",boxShadow:"0 24px 64px -16px rgba(0,0,0,0.6)"}}>
+              <div style={{fontSize:16,fontWeight:700,color:"#F1F5F9",marginBottom:8}}>Remove {mentor?.name || "Mentor"}?</div>
+              <div style={{fontSize:13,color:"#94A3B8",lineHeight:1.7,marginBottom:20}}>
+                Your enrollment will end in <strong style={{color:"#FBBF24"}}>7 days</strong>. During this period, you can still access their exercises and cancel the removal.
+              </div>
+              <div style={{background:"rgba(245,158,11,0.06)",border:"1px solid rgba(245,158,11,0.15)",borderRadius:10,padding:"12px 14px",marginBottom:20,display:"flex",gap:10,alignItems:"flex-start"}}>
+                <span style={{fontSize:16,flexShrink:0}}>⏳</span>
+                <div style={{fontSize:12,color:"#FBBF24",lineHeight:1.6}}>You can cancel this anytime within the 7-day window from the mentor banner above.</div>
+              </div>
+              <div style={{display:"flex",gap:10}}>
+                <button onClick={() => setRemoveModal(false)} style={{flex:1,padding:"11px",borderRadius:10,border:"1px solid rgba(148,163,184,0.15)",background:"rgba(30,41,59,0.6)",color:"#CBD5E1",fontWeight:600,fontSize:13,cursor:"pointer"}}>
+                  Cancel
+                </button>
+                <button onClick={requestRemoval} disabled={removing} style={{flex:1,padding:"11px",borderRadius:10,border:"none",background:"linear-gradient(135deg,#DC2626,#EF4444)",color:"white",fontWeight:600,fontSize:13,cursor:"pointer",opacity:removing?0.6:1}}>
+                  {removing ? "Removing..." : "Remove in 7 Days"}
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
@@ -2492,9 +2563,9 @@ function LearnPage({ user }) {
   const stepIdx = steps.findIndex(s => s.id === activeStep);
 
   return (
-    <div style={{flex:1,overflowY:"auto",padding:"20px 14px"}}>
+    <div style={{flex:1,overflowY:"auto",padding:"16px 12px",minWidth:0}}>
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
-      <div style={{maxWidth:700,margin:"0 auto"}}>
+      <div style={{maxWidth:700,margin:"0 auto",minWidth:0}}>
         {/* Back + Topic header */}
         <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:16}}>
           <button onClick={() => { setActiveTopic(null); loadStatus(); }}
@@ -2521,34 +2592,34 @@ function LearnPage({ user }) {
 
         {/* ── LESSON STEP ── */}
         {!lessonLoading && lesson && activeStep === "lesson" && (
-          <div style={{display:"grid",gap:14}}>
-            <div style={{background:"rgba(30,41,59,0.5)",border:"1px solid rgba(148,163,184,0.07)",borderRadius:12,padding:"18px 20px"}}>
+          <div style={{display:"grid",gap:12,minWidth:0}}>
+            <div style={{background:"rgba(30,41,59,0.5)",border:"1px solid rgba(148,163,184,0.07)",borderRadius:12,padding:"14px 16px",minWidth:0}}>
               <div style={{fontSize:15,fontWeight:700,color:"#F1F5F9",marginBottom:10}}>{lesson.title}</div>
-              <div style={{fontSize:13,color:"#CBD5E1",lineHeight:1.8,whiteSpace:"pre-wrap"}}>{lesson.explanation}</div>
+              <div style={{fontSize:13,color:"#CBD5E1",lineHeight:1.8,whiteSpace:"pre-wrap",wordBreak:"break-word",overflowWrap:"anywhere"}}>{lesson.explanation}</div>
             </div>
-            <div style={{background:"rgba(30,41,59,0.5)",border:"1px solid rgba(148,163,184,0.07)",borderRadius:12,padding:"18px 20px"}}>
+            <div style={{background:"rgba(30,41,59,0.5)",border:"1px solid rgba(148,163,184,0.07)",borderRadius:12,padding:"14px 16px",minWidth:0}}>
               <div style={{fontSize:13,fontWeight:700,color:"#FBBF24",marginBottom:8}}>Why It Matters</div>
-              <div style={{fontSize:12,color:"#94A3B8",lineHeight:1.7}}>{lesson.why_it_matters}</div>
+              <div style={{fontSize:12,color:"#94A3B8",lineHeight:1.7,wordBreak:"break-word"}}>{lesson.why_it_matters}</div>
             </div>
-            <div style={{background:"rgba(30,41,59,0.5)",border:"1px solid rgba(59,130,246,0.1)",borderRadius:12,padding:"18px 20px"}}>
+            <div style={{background:"rgba(30,41,59,0.5)",border:"1px solid rgba(59,130,246,0.1)",borderRadius:12,padding:"14px 16px",minWidth:0}}>
               <div style={{fontSize:13,fontWeight:700,color:"#60A5FA",marginBottom:8}}>Real-World Analogy</div>
-              <div style={{fontSize:12,color:"#94A3B8",lineHeight:1.7}}>{lesson.real_world}</div>
+              <div style={{fontSize:12,color:"#94A3B8",lineHeight:1.7,wordBreak:"break-word"}}>{lesson.real_world}</div>
             </div>
             {lesson.code_examples?.map((ex, i) => (
-              <div key={i} style={{background:"rgba(30,41,59,0.5)",border:"1px solid rgba(148,163,184,0.07)",borderRadius:12,padding:"18px 20px"}}>
+              <div key={i} style={{background:"rgba(30,41,59,0.5)",border:"1px solid rgba(148,163,184,0.07)",borderRadius:12,padding:"14px 16px",minWidth:0}}>
                 <div style={{fontSize:12,fontWeight:600,color:"#E2E8F0",marginBottom:8}}>Example {i+1}: {ex.title}</div>
-                <pre style={{background:"rgba(15,23,42,0.7)",borderRadius:8,padding:"12px 14px",fontSize:12,color:"#93C5FD",overflow:"auto",marginBottom:8,fontFamily:"monospace",lineHeight:1.6}}>{ex.code}</pre>
-                <div style={{fontSize:11,color:"#64748B"}}>{ex.explanation}</div>
+                <pre style={{background:"rgba(15,23,42,0.7)",borderRadius:8,padding:"10px 12px",fontSize:11,color:"#93C5FD",overflowX:"auto",marginBottom:8,fontFamily:"monospace",lineHeight:1.6,maxWidth:"100%",whiteSpace:"pre",wordBreak:"normal"}}>{ex.code}</pre>
+                <div style={{fontSize:11,color:"#64748B",wordBreak:"break-word"}}>{ex.explanation}</div>
               </div>
             ))}
             {lesson.key_rules?.length > 0 && (
-              <div style={{background:"rgba(30,41,59,0.5)",border:"1px solid rgba(245,158,11,0.1)",borderRadius:12,padding:"18px 20px"}}>
+              <div style={{background:"rgba(30,41,59,0.5)",border:"1px solid rgba(245,158,11,0.1)",borderRadius:12,padding:"14px 16px",minWidth:0}}>
                 <div style={{fontSize:13,fontWeight:700,color:"#F59E0B",marginBottom:10}}>Key Rules</div>
                 <div style={{display:"grid",gap:6}}>
                   {lesson.key_rules.map((r, i) => (
                     <div key={i} style={{display:"flex",gap:8,alignItems:"flex-start"}}>
                       <span style={{fontSize:11,color:"#F59E0B",flexShrink:0,marginTop:1}}>•</span>
-                      <span style={{fontSize:12,color:"#94A3B8",lineHeight:1.6}}>{r}</span>
+                      <span style={{fontSize:12,color:"#94A3B8",lineHeight:1.6,wordBreak:"break-word"}}>{r}</span>
                     </div>
                   ))}
                 </div>
@@ -2565,13 +2636,13 @@ function LearnPage({ user }) {
 
         {/* ── PRACTICE STEP ── */}
         {!lessonLoading && lesson && activeStep === "practice" && (
-          <div style={{display:"grid",gap:12}}>
+          <div style={{display:"grid",gap:12,minWidth:0}}>
             <div style={{fontSize:13,color:"#64748B",marginBottom:4}}>Complete the exercises below. Want more? Generate additional practice at any difficulty.</div>
             {[...(lesson.practice_exercises || []), ...extraExercises].map((ex, idx) => {
               const result = practiceResults[idx];
               const diffColor = ex.difficulty === "easy" ? "#10B981" : ex.difficulty === "medium" ? "#FBBF24" : "#F43F5E";
               return (
-                <div key={idx} style={{background:"rgba(30,41,59,0.5)",border:"1px solid rgba(148,163,184,0.07)",borderRadius:12,padding:"18px 20px"}}>
+                <div key={idx} style={{background:"rgba(30,41,59,0.5)",border:"1px solid rgba(148,163,184,0.07)",borderRadius:12,padding:"14px 16px",minWidth:0}}>
                   <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
                     <span style={{fontSize:9,fontWeight:700,padding:"2px 8px",borderRadius:99,background:`${diffColor}15`,color:diffColor,textTransform:"uppercase"}}>{ex.difficulty}</span>
                     <span style={{fontSize:13,fontWeight:600,color:"#E2E8F0"}}>{ex.title}</span>
@@ -2581,7 +2652,7 @@ function LearnPage({ user }) {
                   <textarea
                     value={practiceCode[idx] ?? ex.starter_code ?? ""}
                     onChange={e => setPracticeCode(prev => ({ ...prev, [idx]: e.target.value }))}
-                    style={{width:"100%",minHeight:80,background:"rgba(15,23,42,0.7)",border:"1px solid rgba(148,163,184,0.1)",borderRadius:8,padding:"10px 12px",fontSize:12,color:"#93C5FD",fontFamily:"monospace",resize:"vertical",outline:"none"}}
+                    style={{width:"100%",maxWidth:"100%",boxSizing:"border-box",minHeight:80,background:"rgba(15,23,42,0.7)",border:"1px solid rgba(148,163,184,0.1)",borderRadius:8,padding:"10px 12px",fontSize:12,color:"#93C5FD",fontFamily:"monospace",resize:"vertical",outline:"none"}}
                   />
                   <div style={{display:"flex",gap:8,marginTop:8}}>
                     <button onClick={() => runExercise(idx)} disabled={runningEx === idx}
@@ -2590,14 +2661,14 @@ function LearnPage({ user }) {
                     </button>
                   </div>
                   {result && (
-                    <pre style={{marginTop:8,background:result.success?"rgba(16,185,129,0.06)":"rgba(244,63,94,0.06)",border:`1px solid ${result.success?"rgba(16,185,129,0.15)":"rgba(244,63,94,0.15)"}`,borderRadius:8,padding:"10px 12px",fontSize:11,color:result.success?"#34D399":"#FB7185",fontFamily:"monospace",overflow:"auto",whiteSpace:"pre-wrap"}}>{result.output}</pre>
+                    <pre style={{marginTop:8,background:result.success?"rgba(16,185,129,0.06)":"rgba(244,63,94,0.06)",border:`1px solid ${result.success?"rgba(16,185,129,0.15)":"rgba(244,63,94,0.15)"}`,borderRadius:8,padding:"10px 12px",fontSize:11,color:result.success?"#34D399":"#FB7185",fontFamily:"monospace",overflowX:"auto",whiteSpace:"pre-wrap",wordBreak:"break-word",maxWidth:"100%"}}>{result.output}</pre>
                   )}
                 </div>
               );
             })}
 
             {/* Generate More Practice */}
-            <div style={{background:"rgba(30,41,59,0.5)",border:"1px dashed rgba(139,92,246,0.25)",borderRadius:12,padding:"16px 20px"}}>
+            <div style={{background:"rgba(30,41,59,0.5)",border:"1px dashed rgba(139,92,246,0.25)",borderRadius:12,padding:"14px 16px"}}>
               <div style={{fontSize:13,fontWeight:600,color:"#A78BFA",marginBottom:10}}>Want More Practice?</div>
               <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
                 <div style={{display:"flex",borderRadius:8,overflow:"hidden",border:"1px solid rgba(148,163,184,0.1)"}}>
@@ -2628,12 +2699,12 @@ function LearnPage({ user }) {
 
         {/* ── QUIZ STEP ── */}
         {!lessonLoading && lesson && activeStep === "quiz" && (
-          <div style={{display:"grid",gap:12}}>
+          <div style={{display:"grid",gap:12,minWidth:0}}>
             <div style={{fontSize:13,color:"#64748B",marginBottom:4}}>Answer these questions to prove your understanding. Score 70%+ to proceed to the final build.</div>
             {(lesson.key_rules || []).map((rule, idx) => {
               const isCorrect = quizSubmitted && quizAnswers[idx] === "true";
               return (
-                <div key={idx} style={{background:"rgba(30,41,59,0.5)",border:`1px solid ${quizSubmitted?(isCorrect?"rgba(16,185,129,0.2)":"rgba(244,63,94,0.2)"):"rgba(148,163,184,0.07)"}`,borderRadius:12,padding:"16px 18px"}}>
+                <div key={idx} style={{background:"rgba(30,41,59,0.5)",border:`1px solid ${quizSubmitted?(isCorrect?"rgba(16,185,129,0.2)":"rgba(244,63,94,0.2)"):"rgba(148,163,184,0.07)"}`,borderRadius:12,padding:"14px 16px",minWidth:0}}>
                   <div style={{fontSize:13,fontWeight:600,color:"#E2E8F0",marginBottom:10}}>Q{idx+1}: Is this statement true about {activeTopic.topic}?</div>
                   <div style={{fontSize:12,color:"#CBD5E1",marginBottom:12,padding:"8px 12px",background:"rgba(15,23,42,0.5)",borderRadius:8,fontStyle:"italic"}}>"{rule}"</div>
                   <div style={{display:"flex",gap:8}}>
@@ -2694,44 +2765,44 @@ function LearnPage({ user }) {
           const assignment = BUILD_ASSIGNMENTS[activeTopic.topic];
           if (!assignment) return <div style={{color:"#64748B",textAlign:"center",padding:40}}>No build assignment for this topic yet.</div>;
           return (
-            <div style={{display:"grid",gap:14}}>
-              <div style={{background:"linear-gradient(135deg,rgba(139,92,246,0.08),rgba(59,130,246,0.08))",border:"1px solid rgba(139,92,246,0.2)",borderRadius:14,padding:"20px 22px"}}>
+            <div style={{display:"grid",gap:12,minWidth:0}}>
+              <div style={{background:"linear-gradient(135deg,rgba(139,92,246,0.08),rgba(59,130,246,0.08))",border:"1px solid rgba(139,92,246,0.2)",borderRadius:12,padding:"16px 16px",minWidth:0}}>
                 <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
                   <span style={{fontSize:20}}>🛠️</span>
-                  <div>
-                    <div style={{fontSize:16,fontWeight:700,color:"#F1F5F9"}}>{assignment.title}</div>
+                  <div style={{minWidth:0}}>
+                    <div style={{fontSize:15,fontWeight:700,color:"#F1F5F9"}}>{assignment.title}</div>
                     <div style={{fontSize:11,color:"#A78BFA",fontWeight:600}}>Final Project — {activeTopic.topic}</div>
                   </div>
                 </div>
-                <div style={{fontSize:13,color:"#CBD5E1",lineHeight:1.7,marginTop:8}}>{assignment.desc}</div>
+                <div style={{fontSize:13,color:"#CBD5E1",lineHeight:1.7,marginTop:8,wordBreak:"break-word"}}>{assignment.desc}</div>
               </div>
 
-              <div style={{background:"rgba(30,41,59,0.5)",border:"1px solid rgba(148,163,184,0.07)",borderRadius:12,padding:"18px 20px"}}>
+              <div style={{background:"rgba(30,41,59,0.5)",border:"1px solid rgba(148,163,184,0.07)",borderRadius:12,padding:"14px 16px",minWidth:0}}>
                 <div style={{fontSize:12,fontWeight:600,color:"#E2E8F0",marginBottom:8}}>Your Code</div>
                 <textarea
                   value={buildCode}
                   onChange={e => setBuildCode(e.target.value)}
-                  style={{width:"100%",minHeight:180,background:"rgba(15,23,42,0.7)",border:"1px solid rgba(148,163,184,0.1)",borderRadius:8,padding:"12px 14px",fontSize:12,color:"#93C5FD",fontFamily:"monospace",resize:"vertical",outline:"none",lineHeight:1.6}}
+                  style={{width:"100%",maxWidth:"100%",boxSizing:"border-box",minHeight:160,background:"rgba(15,23,42,0.7)",border:"1px solid rgba(148,163,184,0.1)",borderRadius:8,padding:"10px 12px",fontSize:12,color:"#93C5FD",fontFamily:"monospace",resize:"vertical",outline:"none",lineHeight:1.6}}
                 />
-                <div style={{display:"flex",gap:8,marginTop:10}}>
+                <div style={{display:"flex",gap:8,marginTop:10,flexWrap:"wrap"}}>
                   <button onClick={runBuild} disabled={buildRunning}
-                    style={{padding:"8px 20px",borderRadius:8,border:"none",background:"rgba(59,130,246,0.15)",color:"#60A5FA",fontWeight:600,fontSize:12,cursor:"pointer",opacity:buildRunning?0.6:1}}>
+                    style={{padding:"8px 16px",borderRadius:8,border:"none",background:"rgba(59,130,246,0.15)",color:"#60A5FA",fontWeight:600,fontSize:12,cursor:"pointer",opacity:buildRunning?0.6:1}}>
                     {buildRunning ? "Running..." : "Run Code"}
                   </button>
                   {!activeTopic.build_done && (
                     <button onClick={() => { markComplete("build"); setActiveTopic(prev => ({...prev, build_done: true, current_step: "done", completed: true})); }}
-                      style={{padding:"8px 20px",borderRadius:8,border:"none",background:"linear-gradient(135deg,#059669,#10B981)",color:"white",fontWeight:600,fontSize:12,cursor:"pointer"}}>
+                      style={{padding:"8px 16px",borderRadius:8,border:"none",background:"linear-gradient(135deg,#059669,#10B981)",color:"white",fontWeight:600,fontSize:12,cursor:"pointer"}}>
                       Submit & Complete Topic
                     </button>
                   )}
                 </div>
                 {buildResult && (
-                  <pre style={{marginTop:10,background:buildResult.success?"rgba(16,185,129,0.06)":"rgba(244,63,94,0.06)",border:`1px solid ${buildResult.success?"rgba(16,185,129,0.15)":"rgba(244,63,94,0.15)"}`,borderRadius:8,padding:"10px 12px",fontSize:11,color:buildResult.success?"#34D399":"#FB7185",fontFamily:"monospace",overflow:"auto",whiteSpace:"pre-wrap"}}>{buildResult.output}</pre>
+                  <pre style={{marginTop:10,background:buildResult.success?"rgba(16,185,129,0.06)":"rgba(244,63,94,0.06)",border:`1px solid ${buildResult.success?"rgba(16,185,129,0.15)":"rgba(244,63,94,0.15)"}`,borderRadius:8,padding:"10px 12px",fontSize:11,color:buildResult.success?"#34D399":"#FB7185",fontFamily:"monospace",overflowX:"auto",whiteSpace:"pre-wrap",wordBreak:"break-word",maxWidth:"100%"}}>{buildResult.output}</pre>
                 )}
               </div>
 
               {activeTopic.build_done && (
-                <div style={{background:"rgba(16,185,129,0.06)",border:"1px solid rgba(16,185,129,0.2)",borderRadius:12,padding:"18px 20px",textAlign:"center"}}>
+                <div style={{background:"rgba(16,185,129,0.06)",border:"1px solid rgba(16,185,129,0.2)",borderRadius:12,padding:"14px 16px",textAlign:"center"}}>
                   <div style={{fontSize:24,marginBottom:6}}>🎉</div>
                   <div style={{fontSize:16,fontWeight:700,color:"#10B981",marginBottom:4}}>Topic Complete!</div>
                   <div style={{fontSize:12,color:"#34D399",marginBottom:12}}>You've mastered {activeTopic.topic}. The next topic is now unlocked.</div>
@@ -3073,7 +3144,7 @@ function LeaderboardPage({ user }) {
                   const isCenter = idx === 0;
                   const h = isCenter ? 120 : 95;
                   return (
-                    <div key={s.id} style={{display:"flex",flexDirection:"column",alignItems:"center",width:isCenter?140:110}}>
+                    <div key={s.id} style={{display:"flex",flexDirection:"column",alignItems:"center",flex:isCenter?"1.3 1 0":"1 1 0",minWidth:0,maxWidth:isCenter?140:110}}>
                       <div style={{fontSize:isCenter?28:22,marginBottom:4}}>{medals[idx]}</div>
                       <div style={{width:isCenter?52:42,height:isCenter?52:42,borderRadius:"50%",background:`linear-gradient(135deg,${s.color},${s.color}99)`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:isCenter?18:14,fontWeight:800,color:"white",border:`3px solid ${podiumColors[idx]}`,marginBottom:6}}>{s.initials}</div>
                       <div style={{fontSize:isCenter?14:12,fontWeight:700,color:"#E2E8F0",textAlign:"center",marginBottom:2,maxWidth:"100%",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{s.name}{s.is_me?" (You)":""}</div>
@@ -3386,12 +3457,12 @@ function OnboardingFlow({ user, role, onComplete }) {
     onComplete({ level, goal });
   };
 
-  const cardBase = {background:"rgba(30,41,59,0.5)",border:"1px solid rgba(148,163,184,0.1)",borderRadius:14,padding:"16px",cursor:"pointer",transition:"all 0.2s"};
+  const cardBase = {background:"rgba(30,41,59,0.5)",border:"1px solid rgba(148,163,184,0.1)",borderRadius:12,padding:"12px 14px",cursor:"pointer",transition:"all 0.2s"};
   const selectedCard = (sel) => sel ? {background:"rgba(59,130,246,0.1)",border:"1px solid rgba(59,130,246,0.3)"} : {};
 
   return (
-    <div style={{position:"fixed",inset:0,background:"#0F172A",zIndex:100,display:"flex",alignItems:"center",justifyContent:"center",overflow:"auto",padding:20}}>
-      <div style={{width:"100%",maxWidth:520,animation:"fadein 0.4s ease"}}>
+    <div style={{position:"fixed",inset:0,background:"#0F172A",zIndex:100,overflowY:"auto",WebkitOverflowScrolling:"touch",padding:"24px 16px"}}>
+      <div style={{width:"100%",maxWidth:520,margin:"0 auto",minHeight:"100%",display:"flex",flexDirection:"column",justifyContent:"center",animation:"fadein 0.4s ease"}}>
 
         {/* Step 0: Welcome */}
         {step===0 && (
@@ -3399,7 +3470,7 @@ function OnboardingFlow({ user, role, onComplete }) {
             <div style={{width:72,height:72,borderRadius:18,background:grad,display:"inline-flex",alignItems:"center",justifyContent:"center",marginBottom:20}}>
               <svg viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" style={{width:32,height:32}}><path strokeLinecap="round" strokeLinejoin="round" d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
             </div>
-            <div style={{fontSize:28,fontWeight:800,color:"#F1F5F9",marginBottom:8}}>Welcome to LearnFlow{user?.name ? `, ${user.name.split(" ")[0]}` : ""}!</div>
+            <div style={{fontSize:"clamp(22px,5vw,28px)",fontWeight:800,color:"#F1F5F9",marginBottom:8}}>Welcome to LearnFlow{user?.name ? `, ${user.name.split(" ")[0]}` : ""}!</div>
             <div style={{fontSize:15,color:"#94A3B8",lineHeight:1.7,marginBottom:32,maxWidth:400,margin:"0 auto 32px"}}>
               {role==="teacher"
                 ? "You're about to set up your teaching dashboard. Let's get you started in under a minute."
@@ -3420,13 +3491,13 @@ function OnboardingFlow({ user, role, onComplete }) {
         {step===1 && (
           <div>
             <div style={{textAlign:"center",marginBottom:24}}>
-              <div style={{fontSize:22,fontWeight:800,color:"#F1F5F9",marginBottom:6}}>
+              <div style={{fontSize:"clamp(18px,4.5vw,22px)",fontWeight:800,color:"#F1F5F9",marginBottom:6}}>
                 {role==="teacher" ? "What do you teach?" : "What's your Python level?"}
               </div>
               <div style={{fontSize:13,color:"#64748B"}}>This helps us personalize your experience</div>
             </div>
 
-            <div style={{display:"grid",gap:10,marginBottom:24}}>
+            <div style={{display:"grid",gap:8,marginBottom:18}}>
               {levels.map(l => (
                 <div key={l.id} onClick={()=>setLevel(l.id)}
                   style={{...cardBase,...selectedCard(level===l.id),display:"flex",alignItems:"center",gap:14}}
@@ -3442,13 +3513,13 @@ function OnboardingFlow({ user, role, onComplete }) {
               ))}
             </div>
 
-            <div style={{textAlign:"center",marginBottom:20}}>
-              <div style={{fontSize:16,fontWeight:700,color:"#F1F5F9",marginBottom:6}}>What's your goal?</div>
+            <div style={{textAlign:"center",marginBottom:12}}>
+              <div style={{fontSize:15,fontWeight:700,color:"#F1F5F9",marginBottom:4}}>What's your goal?</div>
             </div>
-            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:28}}>
+            <div className="lf-grid-2" style={{gap:8,marginBottom:20}}>
               {goals.map(g => (
                 <div key={g.id} onClick={()=>setGoal(g.id)}
-                  style={{...cardBase,...selectedCard(goal===g.id),textAlign:"center",padding:"18px 12px"}}
+                  style={{...cardBase,...selectedCard(goal===g.id),textAlign:"center",padding:"14px 10px"}}
                   onMouseEnter={e=>{if(goal!==g.id)e.currentTarget.style.borderColor="rgba(148,163,184,0.2)";}}
                   onMouseLeave={e=>{if(goal!==g.id)e.currentTarget.style.borderColor="rgba(148,163,184,0.1)";}}>
                   <div style={{fontSize:24,marginBottom:6}}>{g.emoji}</div>
@@ -3546,7 +3617,7 @@ function OnboardingFlow({ user, role, onComplete }) {
               <div style={{textAlign:"center",animation:"fadein 0.4s ease"}}>
                 <div style={{fontSize:64,marginBottom:16}}>🎉</div>
 
-                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10,marginBottom:24}}>
+                <div className="lf-grid-3" style={{gap:10,marginBottom:24}}>
                   {[
                     {emoji:"🌱", label:"Level", value:levels.find(l=>l.id===level)?.label||"Beginner"},
                     {emoji:"🎯", label:"Goal", value:goals.find(g=>g.id===goal)?.label||"Exploring"},
@@ -3720,10 +3791,24 @@ export default function App() {
         .lf-show-mobile { display:none; }
         .lf-cta-row     { flex-direction:row; }
 
+        /* Grid helpers — default multi-column, stack on mobile */
+        .lf-grid-2 { display:grid; grid-template-columns:1fr 1fr; }
+        .lf-grid-3 { display:grid; grid-template-columns:1fr 1fr 1fr; }
+
         @media (max-width:640px) {
           .lf-hide-mobile { display:none !important; }
           .lf-show-mobile { display:flex !important; }
           .lf-cta-row     { flex-direction:column !important; }
+          .lf-grid-2 { grid-template-columns:1fr !important; }
+          .lf-grid-3 { grid-template-columns:1fr 1fr !important; }
+          .lf-stack-mobile { grid-template-columns:1fr !important; }
+          .lf-hero-pad { padding-top:48px !important; padding-bottom:40px !important; }
+          .lf-pricing-grid { grid-template-columns:1fr !important; }
+          .lf-teachers-grid { grid-template-columns:1fr !important; }
+        }
+
+        @media (max-width:380px) {
+          .lf-grid-3 { grid-template-columns:1fr !important; }
         }
 
         /* Mobile responsive tweaks for app shell */

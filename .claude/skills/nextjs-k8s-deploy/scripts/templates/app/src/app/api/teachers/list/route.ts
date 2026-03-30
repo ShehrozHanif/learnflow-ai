@@ -21,14 +21,24 @@ export async function GET(req: NextRequest) {
     ORDER BY u.name
   `);
 
+  // Ensure removal_requested_at column exists
+  await pool.query(`ALTER TABLE enrollments ADD COLUMN IF NOT EXISTS removal_requested_at TIMESTAMPTZ DEFAULT NULL`).catch(() => {});
+
+  // Auto-remove enrollments where 7 days have passed since removal request
+  await pool.query(`DELETE FROM enrollments WHERE removal_requested_at IS NOT NULL AND removal_requested_at < NOW() - INTERVAL '7 days'`).catch(() => {});
+
   // If student, also check if enrolled with any teacher
   let myMentorId = null;
+  let removalRequestedAt = null;
   if (user.role === "student") {
     const { rows: enrollRows } = await pool.query(
-      `SELECT teacher_id FROM enrollments WHERE student_id = $1 LIMIT 1`,
+      `SELECT teacher_id, removal_requested_at FROM enrollments WHERE student_id = $1 LIMIT 1`,
       [user.user_id]
     );
-    if (enrollRows.length > 0) myMentorId = enrollRows[0].teacher_id;
+    if (enrollRows.length > 0) {
+      myMentorId = enrollRows[0].teacher_id;
+      removalRequestedAt = enrollRows[0].removal_requested_at;
+    }
   }
 
   const colors = ["#3B82F6","#6366F1","#8B5CF6","#F59E0B","#10B981","#F43F5E","#60A5FA","#34D399"];
@@ -49,5 +59,6 @@ export async function GET(req: NextRequest) {
       is_my_mentor: t.id === myMentorId,
     })),
     my_mentor_id: myMentorId,
+    removal_requested_at: removalRequestedAt,
   });
 }
